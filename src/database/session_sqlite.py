@@ -9,7 +9,8 @@ from database import Base
 
 settings = get_settings()
 
-SQLITE_DATABASE_URL = f"sqlite+aiosqlite:///{settings.PATH_TO_DB}"
+SQLITE_DATABASE_URL = settings.SQLITE_DB_URL
+
 sqlite_engine = create_async_engine(SQLITE_DATABASE_URL, echo=False)
 AsyncSQLiteSessionLocal = sessionmaker(
     bind=sqlite_engine,
