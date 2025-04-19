@@ -12,3 +12,10 @@ from schemas.users import (
     ProfileCreateSchema,
     ProfileResponseSchema,
 )
+from schemas.movies import (
+    MovieDetailSchema,
+    MovieListResponseSchema,
+    MovieListItemSchema,
+    MovieCreateSchema,
+    MovieUpdateSchema
+)

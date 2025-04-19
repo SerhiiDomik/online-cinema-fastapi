@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from routes import (
     users_router,
+    movie_router,
 )
 
 app = FastAPI(
@@ -11,3 +12,4 @@ app = FastAPI(
 )
 
 app.include_router(users_router, prefix=f"/users", tags=["users"])
+app.include_router(movie_router, prefix=f"/movies", tags=["movies"])
