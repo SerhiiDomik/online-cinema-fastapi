@@ -1,12 +1,19 @@
 import os
 
-from fastapi import Depends
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from config.settings import TestingSettings, Settings
+from database import User
+from database.session_sqlite import get_sqlite_db
 from notifications import EmailSenderInterface, EmailSender
 from security.interfaces import JWTAuthManagerInterface
 from security.token_manager import JWTAuthManager
 from storages import S3StorageInterface, S3StorageClient
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
 
 def get_settings() -> Settings:
@@ -50,3 +57,27 @@ def get_s3_storage_client(
         secret_key=settings.S3_STORAGE_SECRET_KEY,
         bucket_name=settings.S3_BUCKET_NAME
     )
+
+
+async def get_current_user(
+        token: str = Depends(oauth2_scheme),
+        jwt_auth: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+        db: AsyncSession = Depends(get_sqlite_db)
+) -> User:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt_auth.decode_token(token)
+        user_id: int = int(payload.get("sub"))
+        if user_id is None:
+            raise credentials_exception
+    except (JWTError, ValueError, AttributeError):
+        raise credentials_exception
+
+    user = await db.get(User, user_id)
+    if user is None:
+        raise credentials_exception
+    return user

@@ -66,6 +66,7 @@ class User(Base):
 
     group_id: Mapped[int] = mapped_column(ForeignKey("user_groups.id", ondelete="CASCADE"), nullable=False)
     group: Mapped["UserGroup"] = relationship("UserGroupModel", back_populates="users")
+    comments: Mapped[list["CommentModel"]] = relationship("CommentModel", back_populates="user")
 
     activation_token: Mapped[Optional["ActivationTokenModel"]] = relationship(
         "ActivationTokenModel",

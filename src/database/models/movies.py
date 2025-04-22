@@ -1,8 +1,9 @@
+from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from typing import Optional
 
-from sqlalchemy import String, Float, Text, DECIMAL, UniqueConstraint, ForeignKey, Table, Column
+from sqlalchemy import String, Float, Text, DECIMAL, UniqueConstraint, ForeignKey, Table, Column, func
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 
 from database import Base
@@ -120,6 +121,7 @@ class MovieModel(Base):
     description: Mapped[str] = mapped_column(Text, nullable=False)
     price: Mapped[Decimal] = mapped_column(DECIMAL(10, 2), nullable=False)
     certification_id: Mapped[int] = mapped_column(ForeignKey("certifications.id"), nullable=False)
+    comments: Mapped[list["CommentModel"]] = relationship(back_populates="movie")
 
     certification: Mapped["CertificationModel"] = relationship(
         "CertificationModel",
@@ -154,3 +156,17 @@ class MovieModel(Base):
 
     def __repr__(self):
         return f"<Movie(name='{self.name}')>"
+
+
+class CommentModel(Base):
+    __tablename__ = "comments"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    movie_id: Mapped[int] = mapped_column(ForeignKey("movies.id", ondelete="CASCADE"), nullable=False)
+
+    user: Mapped["User"] = relationship(back_populates="comments")
+    movie: Mapped["MovieModel"] = relationship(back_populates="comments")
+

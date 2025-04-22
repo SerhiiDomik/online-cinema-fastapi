@@ -16,6 +16,21 @@ from schemas.examples.movies import (
 )
 
 
+class CommentCreate(BaseModel):
+    content: str = Field(..., min_length=1, max_length=1000)
+
+
+class CommentSchema(CommentCreate):
+    id: int
+    created_at: datetime
+    user_id: int
+    movie_id: int
+    user_email: str
+
+    class Config:
+        from_attributes = True
+
+
 class CertificationSchema(BaseModel):
     id: int
     name: str
@@ -115,6 +130,7 @@ class MovieListItemSchema(MovieBaseSchema):
 class MovieDetailSchema(MovieListItemSchema):
     meta_score: Optional[float]
     gross: Optional[float]
+    comments: list[CommentSchema]
 
     class Config:
         json_schema_extra = {"example": movie_detail_example}

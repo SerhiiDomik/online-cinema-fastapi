@@ -1,12 +1,13 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select, func, or_, and_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
-from database import get_db
+from config.dependencies import get_current_user
+from database import get_db, User
 from database.models import (
     MovieModel,
     GenreModel,
@@ -14,12 +15,13 @@ from database.models import (
     DirectorModel,
     CertificationModel,
 )
+from database.models.movies import CommentModel
 from schemas.movies import (
     MovieListResponseSchema,
     MovieListItemSchema,
     MovieDetailSchema,
     MovieCreateSchema,
-    MovieUpdateSchema
+    MovieUpdateSchema, CommentSchema, CommentCreate
 )
 router = APIRouter()
 
@@ -114,6 +116,7 @@ async def get_movie_list(
 
     total_pages = (total_items + per_page - 1) // per_page
 
+    stmt = stmt.offset((page - 1) * per_page).limit(per_page)
     result = await db.execute(stmt.options(
         joinedload(MovieModel.certification),
         selectinload(MovieModel.genres),
@@ -264,13 +267,17 @@ async def get_movie_by_id(
             joinedload(MovieModel.certification),
             selectinload(MovieModel.genres),
             selectinload(MovieModel.directors),
-            selectinload(MovieModel.stars)
+            selectinload(MovieModel.stars ),
+            selectinload(MovieModel.comments).joinedload(CommentModel.user),
         )
     )
     movie = result.scalar_one_or_none()
 
     if not movie:
         raise HTTPException(status_code=404, detail="Movie not found")
+
+    for comment in movie.comments:
+        comment.user_email = comment.user.email
 
     return MovieDetailSchema.model_validate(movie)
 
@@ -415,3 +422,63 @@ async def update_movie(
         raise HTTPException(status_code=400, detail=str(e))
 
     return MovieDetailSchema.model_validate(movie)
+
+
+@router.post(
+    "/movies/{movie_id}/comments",
+    response_model=CommentSchema,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_comment(
+        movie_id: int,
+        comment_data: CommentCreate,
+        db: AsyncSession = Depends(get_db),
+        current_user: User = Depends(get_current_user),
+):
+    movie = await db.get(MovieModel, movie_id)
+    if not movie:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Movies not found"
+        )
+
+    comment = CommentModel(
+        content=comment_data.content,
+        user_id=current_user.id,
+        movie_id=movie_id
+    )
+
+    try:
+        db.add(comment)
+        await db.commit()
+        await db.refresh(comment)
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Error to create comment"
+        )
+
+    comment.user_email = current_user.email
+    return comment
+
+
+@router.get(
+    "/movies/{movie_id}/comments",
+    response_model=list[CommentSchema],
+)
+async def get_comments(
+        movie_id: int,
+        db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(CommentModel)
+        .where(CommentModel.movie_id == movie_id)
+        .options(joinedload(CommentModel.user))
+        .order_by(CommentModel.created_at.desc())
+    )
+    comments = result.scalars().all()
+
+    for comment in comments:
+        comment.user_email = comment.user.email
+    return comments
