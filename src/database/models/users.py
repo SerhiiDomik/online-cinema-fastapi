@@ -22,6 +22,7 @@ from sqlalchemy.orm import (
 )
 
 from database.models.base import Base
+from database.models.movies import CommentModel, MovieReactionModel, MovieRatingModel, FavoriteMoviesModel
 from database.validators import accounts as validators
 from security.passwords import hash_password, verify_password
 from security.utils import generate_secure_token
@@ -67,6 +68,8 @@ class User(Base):
     group_id: Mapped[int] = mapped_column(ForeignKey("user_groups.id", ondelete="CASCADE"), nullable=False)
     group: Mapped["UserGroup"] = relationship("UserGroupModel", back_populates="users")
     comments: Mapped[list["CommentModel"]] = relationship("CommentModel", back_populates="user")
+    reactions: Mapped[list["MovieReactionModel"]] = relationship(back_populates="user")
+    ratings: Mapped[list["MovieRatingModel"]] = relationship(back_populates="user")
 
     activation_token: Mapped[Optional["ActivationTokenModel"]] = relationship(
         "ActivationTokenModel",
@@ -92,6 +95,10 @@ class User(Base):
         cascade="all, delete-orphan"
     )
 
+    favorite_movies: Mapped[list["FavoriteMoviesModel"]] = relationship(
+        back_populates="user"
+    )
+
     def __repr__(self):
         return f"<UserModel(id={self.id}, email={self.email}, is_active={self.is_active})>"
 
@@ -100,12 +107,6 @@ class User(Base):
 
     @classmethod
     def create(cls, email: str, raw_password: str, group_id: int | Mapped[int]) -> "User":
-        """
-        Factory method to create a new UserModel instance.
-
-        This method simplifies the creation of a new user by handling
-        password hashing and setting required attributes.
-        """
         user = cls(email=email, group_id=group_id)
         user.password = raw_password
         return user
@@ -123,9 +124,6 @@ class User(Base):
         self._hashed_password = hash_password(raw_password)
 
     def verify_password(self, raw_password: str) -> bool:
-        """
-        Verify the provided password against the stored hashed password.
-        """
         return verify_password(raw_password, self._hashed_password)
 
     @validates("email")
@@ -213,13 +211,6 @@ class RefreshTokenModel(TokenBaseModel):
 
     @classmethod
     def create(cls, user_id: int | Mapped[int], days_valid: int, token: str) -> "RefreshTokenModel":
-        """
-        Factory method to create a new RefreshTokenModel instance.
-
-        This method simplifies the creation of a new refresh token by calculating
-        the expiration date based on the provided number of valid days and setting
-        the required attributes.
-        """
         expires_at = datetime.now(timezone.utc) + timedelta(days=days_valid)
         return cls(user_id=user_id, expires_at=expires_at, token=token)
 

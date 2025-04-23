@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional, List
+from typing import Optional, List, Literal
 from pydantic import BaseModel, Field, field_validator
 
 from schemas.examples.movies import (
@@ -29,6 +29,14 @@ class CommentSchema(CommentCreate):
 
     class Config:
         from_attributes = True
+
+
+class ReactionRequest(BaseModel):
+    reaction: Optional[Literal["like", "dislike"]] = None
+
+
+class RatingRequest(BaseModel):
+    rating: int = Field(..., ge=1, le=10)
 
 
 class CertificationSchema(BaseModel):
@@ -131,6 +139,9 @@ class MovieDetailSchema(MovieListItemSchema):
     meta_score: Optional[float]
     gross: Optional[float]
     comments: list[CommentSchema]
+    likes_count: int = 0
+    dislikes_count: int = 0
+    average_rating: Optional[float] = None
 
     class Config:
         json_schema_extra = {"example": movie_detail_example}
@@ -152,3 +163,14 @@ class GenreListSchema(BaseModel):
 
     class Config:
         json_schema_extra = {"example": genre_list_example}
+
+
+class FavoriteMovieSchema(MovieListItemSchema):
+    favorited_at: datetime
+
+
+class FavoriteListResponseSchema(BaseModel):
+    movies: List[FavoriteMovieSchema]
+    total_pages: int
+    total_items: int
+    current_page: int
