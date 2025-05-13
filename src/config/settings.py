@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     ACTIVATION_COMPLETE_EMAIL_TEMPLATE_NAME: str = "activation_complete.html"
     PASSWORD_RESET_TEMPLATE_NAME: str = "password_reset_request.html"
     PASSWORD_RESET_COMPLETE_TEMPLATE_NAME: str = "password_reset_complete.html"
+    COMMENT_REACTION_TEMPLATE: str = "comment_reaction.html"
+    COMMENT_REPLY_TEMPLATE: str = "comment_reply.html"
 
     SECRET_KEY_ACCESS: str = os.getenv("SECRET_KEY_ACCESS", "secret_access_key")
     SECRET_KEY_REFRESH: str = os.getenv("SECRET_KEY_REFRESH", "secret_refresh_key")

@@ -219,6 +219,26 @@ class CommentModel(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     movie_id: Mapped[int] = mapped_column(ForeignKey("movies.id", ondelete="CASCADE"), nullable=False)
+    parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey("comments.id", ondelete="CASCADE"))
 
     user: Mapped["User"] = relationship(back_populates="comments")
     movie: Mapped["MovieModel"] = relationship(back_populates="comments")
+    replies: Mapped[list["CommentModel"]] = relationship(back_populates="parent")
+    parent: Mapped[Optional["CommentModel"]] = relationship(back_populates="replies", remote_side=[id])
+    reactions: Mapped[list["CommentReactionModel"]] = relationship(back_populates="comment")
+
+
+class CommentReactionModel(Base):
+    __tablename__ = "comment_reactions"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    comment_id: Mapped[int] = mapped_column(ForeignKey("comments.id", ondelete="CASCADE"))
+    reaction: Mapped[ReactionEnum] = mapped_column(String(50))
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'comment_id', name='unique_user_comment_reaction'),
+    )
+
+    user: Mapped["User"] = relationship(back_populates="comment_reactions")
+    comment: Mapped["CommentModel"] = relationship(back_populates="reactions")

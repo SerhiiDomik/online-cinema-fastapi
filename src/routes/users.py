@@ -199,7 +199,7 @@ async def activate_account(
     await db.delete(token_record)
     await db.commit()
 
-    login_link = "http://127.0.0.1/accounts/login/"
+    login_link = "http://127.0.0.1/accounts/login/"  #!!!!!!!!!!!!!!!!!!
 
     await email_sender.send_activation_complete_email(
         str(activation_data.email),

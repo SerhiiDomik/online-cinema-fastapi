@@ -23,6 +23,8 @@ class EmailSender(EmailSenderInterface):
         activation_complete_email_template_name: str,
         password_email_template_name: str,
         password_complete_email_template_name: str,
+        comment_reaction_template_name: str,
+        comment_reply_template_name: str,
     ):
         self._hostname = hostname
         self._port = port
@@ -33,21 +35,12 @@ class EmailSender(EmailSenderInterface):
         self._activation_complete_email_template_name = activation_complete_email_template_name
         self._password_email_template_name = password_email_template_name
         self._password_complete_email_template_name = password_complete_email_template_name
+        self._comment_reaction_template_name = comment_reaction_template_name
+        self._comment_reply_template_name = comment_reply_template_name
 
         self._env = Environment(loader=FileSystemLoader(template_dir))
 
     async def _send_email(self, recipient: str, subject: str, html_content: str) -> None:
-        """
-        Asynchronously send an email with the given subject and HTML content.
-
-        Args:
-            recipient (str): The recipient's email address.
-            subject (str): The subject of the email.
-            html_content (str): The HTML content of the email.
-
-        Raises:
-            BaseEmailError: If sending the email fails.
-        """
         message = MIMEMultipart()
         message["From"] = self._email
         message["To"] = recipient
@@ -67,53 +60,57 @@ class EmailSender(EmailSenderInterface):
             raise BaseEmailError(f"Failed to send email to {recipient}: {error}")
 
     async def send_activation_email(self, email: str, activation_link: str) -> None:
-        """
-        Send an account activation email asynchronously.
-
-        Args:
-            email (str): The recipient's email address.
-            activation_link (str): The activation link to be included in the email.
-        """
         template = self._env.get_template(self._activation_email_template_name)
         html_content = template.render(email=email, activation_link=activation_link)
         subject = "Account Activation"
         await self._send_email(email, subject, html_content)
 
     async def send_activation_complete_email(self, email: str, login_link: str) -> None:
-        """
-        Send an account activation completion email asynchronously.
-
-        Args:
-            email (str): The recipient's email address.
-            login_link (str): The login link to be included in the email.
-        """
         template = self._env.get_template(self._activation_complete_email_template_name)
         html_content = template.render(email=email, login_link=login_link)
         subject = "Account Activated Successfully"
         await self._send_email(email, subject, html_content)
 
     async def send_password_reset_email(self, email: str, reset_link: str) -> None:
-        """
-        Send a password reset request email asynchronously.
-
-        Args:
-            email (str): The recipient's email address.
-            reset_link (str): The reset link to be included in the email.
-        """
         template = self._env.get_template(self._password_email_template_name)
         html_content = template.render(email=email, reset_link=reset_link)
         subject = "Password Reset Request"
         await self._send_email(email, subject, html_content)
 
     async def send_password_reset_complete_email(self, email: str, login_link: str) -> None:
-        """
-        Send a password reset completion email asynchronously.
-
-        Args:
-            email (str): The recipient's email address.
-            login_link (str): The login link to be included in the email.
-        """
         template = self._env.get_template(self._password_complete_email_template_name)
         html_content = template.render(email=email, login_link=login_link)
         subject = "Your Password Has Been Successfully Reset"
+        await self._send_email(email, subject, html_content)
+
+    async def send_comment_reaction_notification(
+        self,
+        email: str,
+        reacting_user_email: str,
+        reaction_type: str,
+        comment_content: str
+    ) -> None:
+        template = self._env.get_template(self._comment_reaction_template_name)
+        html_content = template.render(
+            reacting_user=reacting_user_email,
+            reaction_type=reaction_type,
+            comment_content=comment_content
+        )
+        subject = "New Reaction to Your Comment"
+        await self._send_email(email, subject, html_content)
+
+    async def send_comment_reply_notification(
+        self,
+        email: str,
+        replying_user_email: str,
+        parent_comment_content: str,
+        reply_content: str
+    ) -> None:
+        template = self._env.get_template(self._comment_reply_template_name)
+        html_content = template.render(
+            replying_user=replying_user_email,
+            parent_comment=parent_comment_content,
+            reply_content=reply_content
+        )
+        subject = "New Reply to Your Comment"
         await self._send_email(email, subject, html_content)

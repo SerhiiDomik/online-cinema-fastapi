@@ -22,7 +22,15 @@ from sqlalchemy.orm import (
 )
 
 from database.models.base import Base
-from database.models.movies import CommentModel, MovieReactionModel, MovieRatingModel, FavoriteMoviesModel
+from database.models.movies import (
+    CommentModel,
+    MovieReactionModel,
+    MovieRatingModel,
+    FavoriteMoviesModel,
+    CommentReactionModel,
+
+
+)
 from database.validators import accounts as validators
 from security.passwords import hash_password, verify_password
 from security.utils import generate_secure_token
@@ -70,6 +78,7 @@ class User(Base):
     comments: Mapped[list["CommentModel"]] = relationship("CommentModel", back_populates="user")
     reactions: Mapped[list["MovieReactionModel"]] = relationship(back_populates="user")
     ratings: Mapped[list["MovieRatingModel"]] = relationship(back_populates="user")
+    comment_reactions: Mapped[list["CommentReactionModel"]] = relationship(back_populates="user")
 
     activation_token: Mapped[Optional["ActivationTokenModel"]] = relationship(
         "ActivationTokenModel",
@@ -117,9 +126,6 @@ class User(Base):
 
     @password.setter
     def password(self, raw_password: str) -> None:
-        """
-        Set the user's password after validating its strength and hashing it.
-        """
         validators.validate_password_strength(raw_password)
         self._hashed_password = hash_password(raw_password)
 

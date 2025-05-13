@@ -26,9 +26,17 @@ class CommentSchema(CommentCreate):
     user_id: int
     movie_id: int
     user_email: str
+    parent_id: Optional[int] = None
+    replies: List["CommentSchema"] = []
+    likes_count: int = 0
+    dislikes_count: int = 0
 
     class Config:
         from_attributes = True
+
+
+class CommentReactionRequest(BaseModel):
+    reaction: Optional[Literal["like", "dislike"]] = None
 
 
 class ReactionRequest(BaseModel):
