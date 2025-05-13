@@ -2,7 +2,10 @@ from fastapi import FastAPI
 
 from routes import (
     users_router,
-    movie_router,
+    movies_router,
+    favorites_router,
+    genres_router,
+    comments_router,
 )
 
 app = FastAPI(
@@ -12,4 +15,7 @@ app = FastAPI(
 )
 
 app.include_router(users_router, prefix=f"/users", tags=["users"])
-app.include_router(movie_router, prefix=f"/movies", tags=["movies"])
+app.include_router(movies_router,  prefix=f"/movies", tags=["movies"])
+app.include_router(favorites_router,  prefix=f"/favorite-movies", tags=["favorite-movies"])
+app.include_router(genres_router, prefix=f"/genres", tags=["genres"])
+app.include_router(comments_router)

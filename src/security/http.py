@@ -2,13 +2,6 @@ from fastapi import Request, HTTPException, status
 
 
 def get_token(request: Request) -> str:
-    """
-    Extracts the Bearer token from the Authorization header.
-
-    :param request: FastAPI Request object.
-    :return: Extracted token string.
-    :raises HTTPException: If Authorization header is missing or invalid.
-    """
     authorization: str = request.headers.get("Authorization")
 
     if not authorization:

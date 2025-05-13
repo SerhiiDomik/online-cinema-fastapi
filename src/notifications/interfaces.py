@@ -5,44 +5,36 @@ class EmailSenderInterface(ABC):
 
     @abstractmethod
     async def send_activation_email(self, email: str, activation_link: str) -> None:
-        """
-        Asynchronously send an account activation email.
-
-        Args:
-            email (str): The recipient's email address.
-            activation_link (str): The activation link to include in the email.
-        """
         pass
 
     @abstractmethod
     async def send_activation_complete_email(self, email: str, login_link: str) -> None:
-        """
-        Asynchronously send an email confirming that the account has been activated.
-
-        Args:
-            email (str): The recipient's email address.
-            login_link (str): The login link to include in the email.
-        """
         pass
 
     @abstractmethod
     async def send_password_reset_email(self, email: str, reset_link: str) -> None:
-        """
-        Asynchronously send a password reset request email.
-
-        Args:
-            email (str): The recipient's email address.
-            reset_link (str): The password reset link to include in the email.
-        """
         pass
 
     @abstractmethod
     async def send_password_reset_complete_email(self, email: str, login_link: str) -> None:
-        """
-        Asynchronously send an email confirming that the password has been reset.
+        pass
 
-        Args:
-            email (str): The recipient's email address.
-            login_link (str): The login link to include in the email.
-        """
+    @abstractmethod
+    async def send_comment_reaction_notification(
+        self,
+        email: str,
+        reacting_user_email: str,
+        reaction_type: str,
+        comment_content: str
+    ) -> None:
+        pass
+
+    @abstractmethod
+    async def send_comment_reply_notification(
+        self,
+        email: str,
+        replying_user_email: str,
+        parent_comment_content: str,
+        reply_content: str
+    ) -> None:
         pass
