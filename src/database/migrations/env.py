@@ -4,10 +4,8 @@ from alembic import context
 
 from database.models import users, movies  # noqa: F401
 from database.models.base import Base
-from sqlalchemy import create_engine
-from src.config import get_settings
+from database.session_postgresql import sync_postgresql_engine
 
-settings = get_settings()
 
 config = context.config
 
@@ -18,8 +16,7 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    engine = create_engine(settings.SQLITE_DB_URL.replace("+aiosqlite", ""))
-    connectable = engine
+    connectable = sync_postgresql_engine
 
     with connectable.connect() as connection:
         context.configure(
@@ -34,8 +31,7 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    engine = create_engine(settings.SQLITE_DB_URL.replace("+aiosqlite", ""))
-    connectable = engine
+    connectable = sync_postgresql_engine
 
     with connectable.connect() as connection:
         context.configure(

@@ -4,7 +4,7 @@ from pathlib import Path
 from pydantic_settings import BaseSettings
 
 
-class Settings(BaseSettings):
+class BaseAppSettings(BaseSettings):
 
     BASE_DIR: Path = Path(__file__).parent.parent
     SQLITE_DB_URL: str = "sqlite+aiosqlite:///./test.db"
@@ -17,9 +17,6 @@ class Settings(BaseSettings):
     COMMENT_REACTION_TEMPLATE: str = "comment_reaction.html"
     COMMENT_REPLY_TEMPLATE: str = "comment_reply.html"
 
-    SECRET_KEY_ACCESS: str = os.getenv("SECRET_KEY_ACCESS", "secret_access_key")
-    SECRET_KEY_REFRESH: str = os.getenv("SECRET_KEY_REFRESH", "secret_refresh_key")
-    JWT_SIGNING_ALGORITHM: str = os.getenv("JWT_SIGNING_ALGORITHM", "HS256")
     LOGIN_TIME_DAYS: int = 7
 
     EMAIL_HOST: str = os.getenv("EMAIL_HOST", "localhost")
@@ -42,5 +39,19 @@ class Settings(BaseSettings):
         env_file = ".env"
 
 
+class Settings(BaseAppSettings):
+    POSTGRES_USER: str = os.getenv("POSTGRES_USER", "test_user")
+    POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "test_password")
+    POSTGRES_HOST: str = os.getenv("POSTGRES_HOST", "test_host")
+    POSTGRES_DB_PORT: int = int(os.getenv("POSTGRES_DB_PORT", 5432))
+    POSTGRES_DB: str = os.getenv("POSTGRES_DB", "test_db")
+
+    SECRET_KEY_ACCESS: str = os.getenv("SECRET_KEY_ACCESS", os.urandom(32))
+    SECRET_KEY_REFRESH: str = os.getenv("SECRET_KEY_REFRESH", os.urandom(32))
+    JWT_SIGNING_ALGORITHM: str = os.getenv("JWT_SIGNING_ALGORITHM", "HS256")
+
+
 class TestingSettings(Settings):
-    SQLITE_DB_URL: str = "sqlite+aiosqlite:///:memory:"
+    SECRET_KEY_ACCESS: str = "SECRET_KEY_ACCESS"
+    SECRET_KEY_REFRESH: str = "SECRET_KEY_REFRESH"
+    JWT_SIGNING_ALGORITHM: str = "HS256"
