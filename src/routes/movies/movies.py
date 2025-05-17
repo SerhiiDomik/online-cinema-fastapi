@@ -6,7 +6,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
-from config.dependencies import get_current_user
 from database import get_db, User
 from database.models import (
     MovieModel,
@@ -16,6 +15,7 @@ from database.models import (
     CertificationModel,
 )
 from database.models.movies import CommentModel, MovieRatingModel, MovieReactionModel, ReactionEnum
+from routes.dependencies import get_current_user
 from schemas.movies import (
     MovieListResponseSchema,
     MovieListItemSchema,

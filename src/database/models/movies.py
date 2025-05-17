@@ -3,10 +3,20 @@ from decimal import Decimal
 from enum import Enum
 from typing import Optional
 
-from sqlalchemy import String, Float, Text, DECIMAL, UniqueConstraint, ForeignKey, Table, Column, func
+from sqlalchemy import (
+    String,
+    Float,
+    Text,
+    DECIMAL,
+    UniqueConstraint,
+    ForeignKey,
+    Table,
+    Column,
+    func
+)
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 
-from database import Base, User
+from database.models.base import Base
 
 
 class ReactionEnum(str, Enum):
@@ -54,7 +64,6 @@ class FavoriteMoviesModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     movie_id: Mapped[int] = mapped_column(ForeignKey("movies.id", ondelete="CASCADE"))
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     __table_args__ = (
         UniqueConstraint('user_id', 'movie_id', name='unique_user_movie_favorite'),

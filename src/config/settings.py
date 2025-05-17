@@ -25,11 +25,11 @@ class BaseAppSettings(BaseSettings):
     EMAIL_HOST_PASSWORD: str = os.getenv("EMAIL_HOST_PASSWORD", "password")
     EMAIL_USE_TLS: bool = os.getenv("EMAIL_USE_TLS", "False").lower() == "true"
 
-    S3_STORAGE_HOST: str = os.getenv("MINIO_HOST", "minio-theater")
+    S3_STORAGE_HOST: str = os.getenv("MINIO_HOST", "minio-cinema")
     S3_STORAGE_PORT: int = os.getenv("MINIO_PORT", 9000)
     S3_STORAGE_ACCESS_KEY: str = os.getenv("MINIO_ROOT_USER", "minioadmin")
     S3_STORAGE_SECRET_KEY: str = os.getenv("MINIO_ROOT_PASSWORD", "some_password")
-    S3_BUCKET_NAME: str = os.getenv("MINIO_STORAGE", "theater-storage")
+    S3_BUCKET_NAME: str = os.getenv("MINIO_STORAGE", "cinema-storage")
 
     @property
     def S3_STORAGE_ENDPOINT(self) -> str:

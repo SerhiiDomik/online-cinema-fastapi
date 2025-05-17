@@ -3,10 +3,10 @@ from sqlalchemy import select, func, or_, and_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
-from config.dependencies import get_current_user
 from database import get_db, User
 from database.models import MovieModel, GenreModel, CertificationModel, DirectorModel, StarModel
 from database.models.movies import FavoriteMoviesModel
+from routes.dependencies import get_current_user
 from schemas.movies import FavoriteListResponseSchema, FavoriteMovieSchema
 
 router = APIRouter()

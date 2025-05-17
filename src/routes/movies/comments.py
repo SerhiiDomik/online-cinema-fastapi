@@ -3,10 +3,11 @@ from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from config.dependencies import get_current_user, get_accounts_email_notificator
+from config.dependencies import get_accounts_email_notificator
 from database import get_db, User
 from database.models.movies import CommentModel, CommentReactionModel, ReactionEnum
 from notifications import EmailSenderInterface
+from routes.dependencies import get_current_user
 from schemas.movies import CommentSchema, CommentCreate, CommentReactionRequest
 
 router = APIRouter(prefix="/comments", tags=["comments"])
