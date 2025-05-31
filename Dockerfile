@@ -17,7 +17,7 @@ RUN apt update && apt install -y \
 
 # Install Poetry
 RUN python -m pip install --upgrade pip && \
-    pip install poetry
+    pip install "celery[redis]" sqlalchemy[asyncio] asyncpg poetry
 
 # Copy dependency files
 COPY ./poetry.lock /usr/src/poetry/poetry.lock
