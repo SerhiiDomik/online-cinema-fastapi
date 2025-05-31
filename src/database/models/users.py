@@ -30,7 +30,7 @@ from database.models.movies import (
     CommentReactionModel,
 )
 
-from database.validators import accounts as validators
+from database.validators import users as validators
 from security.passwords import hash_password, verify_password
 from security.utils import generate_secure_token
 
@@ -52,10 +52,10 @@ class UserGroup(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[UserGroupEnum] = mapped_column(Enum(UserGroupEnum), nullable=False, unique=True)
 
-    users: Mapped[List["User"]] = relationship("UserModel", back_populates="group")
+    users: Mapped[List["User"]] = relationship("User", back_populates="group")
 
     def __repr__(self):
-        return f"<UserGroupModel(id={self.id}, name={self.name})>"
+        return f"<UserGroup(id={self.id}, name={self.name})>"
 
 
 class User(Base):
@@ -73,7 +73,7 @@ class User(Base):
     )
 
     group_id: Mapped[int] = mapped_column(ForeignKey("user_groups.id", ondelete="CASCADE"), nullable=False)
-    group: Mapped["UserGroup"] = relationship("UserGroupModel", back_populates="users")
+    group: Mapped["UserGroup"] = relationship("UserGroup", back_populates="users")
     comments: Mapped[list["CommentModel"]] = relationship("CommentModel", back_populates="user")
     reactions: Mapped[list["MovieReactionModel"]] = relationship(back_populates="user")
     ratings: Mapped[list["MovieRatingModel"]] = relationship(back_populates="user")
@@ -108,7 +108,7 @@ class User(Base):
     )
 
     def __repr__(self):
-        return f"<UserModel(id={self.id}, email={self.email}, is_active={self.is_active})>"
+        return f"<User(id={self.id}, email={self.email}, is_active={self.is_active})>"
 
     def has_group(self, group_name: UserGroupEnum) -> bool:
         return self.group.name == group_name
@@ -142,7 +142,7 @@ class UserProfileModel(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     first_name: Mapped[Optional[str]] = mapped_column(String(100))
     last_name: Mapped[Optional[str]] = mapped_column(String(100))
-    avatar: Mapped[Optional[str]] = mapped_column(String(255))
+    avatar: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     gender: Mapped[Optional[GenderEnum]] = mapped_column(Enum(GenderEnum))
     date_of_birth: Mapped[Optional[date]] = mapped_column(Date)
     info: Mapped[Optional[str]] = mapped_column(Text)
@@ -151,7 +151,7 @@ class UserProfileModel(Base):
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         unique=True)
-    user: Mapped[User] = relationship("UserModel", back_populates="profile")
+    user: Mapped[User] = relationship("User", back_populates="profile")
 
     __table_args__ = (UniqueConstraint("user_id"),)
 
@@ -184,7 +184,7 @@ class TokenBaseModel(Base):
 class ActivationTokenModel(TokenBaseModel):
     __tablename__ = "activation_tokens"
 
-    user: Mapped[User] = relationship("UserModel", back_populates="activation_token")
+    user: Mapped[User] = relationship("User", back_populates="activation_token")
 
     __table_args__ = (UniqueConstraint("user_id"),)
 
@@ -195,7 +195,7 @@ class ActivationTokenModel(TokenBaseModel):
 class PasswordResetTokenModel(TokenBaseModel):
     __tablename__ = "password_reset_tokens"
 
-    user: Mapped[User] = relationship("UserModel", back_populates="password_reset_token")
+    user: Mapped[User] = relationship("User", back_populates="password_reset_token")
 
     __table_args__ = (UniqueConstraint("user_id"),)
 
@@ -206,7 +206,7 @@ class PasswordResetTokenModel(TokenBaseModel):
 class RefreshTokenModel(TokenBaseModel):
     __tablename__ = "refresh_tokens"
 
-    user: Mapped[User] = relationship("UserModel", back_populates="refresh_tokens")
+    user: Mapped[User] = relationship("User", back_populates="refresh_tokens")
     token: Mapped[str] = mapped_column(
         String(512),
         unique=True,

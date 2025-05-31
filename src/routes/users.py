@@ -2,7 +2,8 @@ from datetime import datetime, timezone
 from typing import cast
 
 from fastapi import APIRouter, Depends, status, HTTPException
-from pydantic import HttpUrl
+from fastapi.security import HTTPBearer
+from pydantic import HttpUrl, EmailStr
 from sqlalchemy import select, delete
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +13,7 @@ from config.dependencies import (
     get_jwt_auth_manager,
     get_settings,
     Settings,
-    get_accounts_email_notificator,
+    get_users_email_notificator,
     get_s3_storage_client,
 )
 from database import (
@@ -43,6 +44,11 @@ from schemas.users import ProfileCreateSchema, ProfileResponseSchema
 from security.interfaces import JWTAuthManagerInterface
 from security.http import get_token
 from storages import S3StorageInterface
+
+import logging
+logger = logging.getLogger(__name__)
+
+security = HTTPBearer()
 
 router = APIRouter()
 
@@ -79,7 +85,7 @@ router = APIRouter()
 async def register_user(
         user_data: UserRegistrationRequestSchema,
         db: AsyncSession = Depends(get_db),
-        email_sender: EmailSenderInterface = Depends(get_accounts_email_notificator),
+        email_sender: EmailSenderInterface = Depends(get_users_email_notificator),
 ) -> UserRegistrationResponseSchema:
     stmt = select(User).where(User.email == user_data.email)
     result = await db.execute(stmt)
@@ -93,11 +99,11 @@ async def register_user(
     stmt = select(UserGroup).where(UserGroup.name == UserGroupEnum.USER)
     result = await db.execute(stmt)
     user_group = result.scalars().first()
+
     if not user_group:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Default user group not found."
-        )
+        user_group = UserGroup(name=UserGroupEnum.USER)
+        db.add(user_group)
+        await db.flush()
 
     try:
         new_user = User.create(
@@ -120,8 +126,7 @@ async def register_user(
             detail="An error occurred during user creation."
         ) from e
     else:
-        # activation_link = "http://127.0.0.1/accounts/activate/"
-        activation_link = f"http://127.0.0.1/accounts/activate/?token={activation_token.token}"
+        activation_link = f"http://localhost:8000/users/activate/?token={activation_token.token}"
 
         await email_sender.send_activation_email(
             new_user.email,
@@ -165,7 +170,7 @@ async def register_user(
 async def activate_account(
         activation_data: UserActivationRequestSchema,
         db: AsyncSession = Depends(get_db),
-        email_sender: EmailSenderInterface = Depends(get_accounts_email_notificator),
+        email_sender: EmailSenderInterface = Depends(get_users_email_notificator),
 ) -> MessageResponseSchema:
     stmt = (
         select(ActivationTokenModel)
@@ -200,7 +205,7 @@ async def activate_account(
     await db.delete(token_record)
     await db.commit()
 
-    login_link = "http://127.0.0.1/accounts/login/"
+    login_link = "http://localhost:8000/users/login/"
 
     await email_sender.send_activation_complete_email(
         str(activation_data.email),
@@ -208,6 +213,50 @@ async def activate_account(
     )
 
     return MessageResponseSchema(message="User account activated successfully.")
+
+
+@router.post(
+    "/resend-activation/",
+    response_model=MessageResponseSchema,
+    summary="Resend Activation Token",
+    description="Resend a new activation token if the old one has expired",
+    status_code=status.HTTP_200_OK
+)
+async def resend_activation_token(
+        email: EmailStr,
+        db: AsyncSession = Depends(get_db),
+        email_sender: EmailSenderInterface = Depends(get_users_email_notificator)
+) -> MessageResponseSchema:
+    stmt = select(User).where(User.email == email)
+    result = await db.execute(stmt)
+    user = result.scalars().first()
+
+    if not user:
+        return MessageResponseSchema(
+            message="If the email is registered, a new activation token will be sent"
+        )
+
+    if user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User account is already active"
+        )
+
+    await db.execute(
+        delete(ActivationTokenModel)
+        .where(ActivationTokenModel.user_id == user.id)
+    )
+
+    new_token = ActivationTokenModel(user_id=user.id)
+    db.add(new_token)
+    await db.commit()
+
+    activation_link = f"http://localhost:8000/users/activate/?token={new_token.token}"
+    await email_sender.send_activation_email(email, activation_link)
+
+    return MessageResponseSchema(
+        message="New activation token has been sent to your email"
+    )
 
 
 @router.post(
@@ -223,7 +272,7 @@ async def activate_account(
 async def request_password_reset_token(
         data: PasswordResetRequestSchema,
         db: AsyncSession = Depends(get_db),
-        email_sender: EmailSenderInterface = Depends(get_accounts_email_notificator)
+        email_sender: EmailSenderInterface = Depends(get_users_email_notificator)
 ) -> MessageResponseSchema:
 
     stmt = select(User).filter_by(email=data.email)
@@ -241,8 +290,7 @@ async def request_password_reset_token(
     db.add(reset_token)
     await db.commit()
 
-    # password_reset_complete_link = "http://127.0.0.1/accounts/password-reset-complete/"
-    password_reset_complete_link = f"http://127.0.0.1/accounts/password-reset-complete/?token={reset_token.token}"
+    password_reset_complete_link = f"http://127.0.0.1/users/password-reset-complete/?token={reset_token.token}"
 
     await email_sender.send_password_reset_email(
         str(data.email),
@@ -255,7 +303,7 @@ async def request_password_reset_token(
 
 
 @router.post(
-    "/reset-password/complete/",
+    "/password-reset/complete/",
     response_model=MessageResponseSchema,
     summary="Reset User Password",
     description="Reset a user's password if a valid token is provided.",
@@ -297,10 +345,10 @@ async def request_password_reset_token(
         },
     },
 )
-async def reset_password(
+async def password_reset_complete(
         data: PasswordResetCompleteRequestSchema,
         db: AsyncSession = Depends(get_db),
-        email_sender: EmailSenderInterface = Depends(get_accounts_email_notificator)
+        email_sender: EmailSenderInterface = Depends(get_users_email_notificator)
 ) -> MessageResponseSchema:
     stmt = select(User).filter_by(email=data.email)
     result = await db.execute(stmt)
@@ -344,7 +392,7 @@ async def reset_password(
             detail="An error occurred while resetting the password."
         )
 
-    login_link = "http://127.0.0.1/accounts/login/"
+    login_link = "http://localhost:8000/users/login/"
 
     await email_sender.send_password_reset_complete_email(
         str(data.email),
@@ -415,7 +463,7 @@ async def login_user(
             detail="User account is not activated.",
         )
 
-    jwt_refresh_token = jwt_manager.create_refresh_token({"user_id": user.id})
+    jwt_refresh_token = jwt_manager.create_refresh_token({"sub": str(user.id)})
 
     try:
         refresh_token = RefreshTokenModel.create(
@@ -433,11 +481,57 @@ async def login_user(
             detail="An error occurred while processing the request.",
         )
 
-    jwt_access_token = jwt_manager.create_access_token({"user_id": user.id})
+    jwt_access_token = jwt_manager.create_access_token({"sub": str(user.id)})
+
     return UserLoginResponseSchema(
         access_token=jwt_access_token,
         refresh_token=jwt_refresh_token,
     )
+
+
+@router.post(
+    "/logout/",
+    response_model=MessageResponseSchema,
+    summary="Logout User",
+    description="Invalidate the refresh token, effectively logging out the user.",
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {
+            "description": "Successfully logged out.",
+            "content": {
+                "application/json": {
+                    "example": {"message": "Successfully logged out."}
+                }
+            },
+        },
+        400: {
+            "description": "Bad Request - The refresh token is invalid.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Invalid refresh token."}
+                }
+            },
+        },
+    },
+)
+async def logout_user(
+    token_data: TokenRefreshRequestSchema,
+    db: AsyncSession = Depends(get_db),
+) -> MessageResponseSchema:
+
+    stmt = delete(RefreshTokenModel).where(
+        RefreshTokenModel.token == token_data.refresh_token
+    )
+    result = await db.execute(stmt)
+    await db.commit()
+
+    if result.rowcount == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid refresh token.",
+        )
+
+    return MessageResponseSchema(message="Successfully logged out.")
 
 
 @router.post(
@@ -486,7 +580,8 @@ async def refresh_access_token(
 ) -> TokenRefreshResponseSchema:
     try:
         decoded_token = jwt_manager.decode_refresh_token(token_data.refresh_token)
-        user_id = decoded_token.get("user_id")
+        user_id = decoded_token.get("sub")
+        user_id_int = int(user_id)
     except BaseSecurityError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -502,7 +597,7 @@ async def refresh_access_token(
             detail="Refresh token not found.",
         )
 
-    stmt = select(User).filter_by(id=user_id)
+    stmt = select(User).filter_by(id=user_id_int)
     result = await db.execute(stmt)
     user = result.scalars().first()
     if not user:
@@ -511,16 +606,17 @@ async def refresh_access_token(
             detail="User not found.",
         )
 
-    new_access_token = jwt_manager.create_access_token({"user_id": user_id})
+    new_access_token = jwt_manager.create_access_token({"sub": user_id})
 
     return TokenRefreshResponseSchema(access_token=new_access_token)
 
 
 @router.post(
-    "/users/{user_id}/profile/",
+    "/{user_id}/profile/",
     response_model=ProfileResponseSchema,
     summary="Create user profile",
-    status_code=status.HTTP_201_CREATED
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(security)]
 )
 async def create_profile(
         user_id: int,
@@ -531,12 +627,20 @@ async def create_profile(
         profile_data: ProfileCreateSchema = Depends(ProfileCreateSchema.from_form)
 ) -> ProfileResponseSchema:
     try:
+        logger.info(token)
         payload = jwt_manager.decode_access_token(token)
-        token_user_id = payload.get("user_id")
+        token_user_id = int(payload.get("sub"))
     except BaseSecurityError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e)
+        )
+
+    allowed_mime_types = {"image/jpeg", "image/png"}
+    if profile_data.avatar.content_type not in allowed_mime_types:
+        raise HTTPException(
+            status_code=400,
+            detail="Only JPEG and PNG images are allowed."
         )
 
     if user_id != token_user_id:
@@ -577,7 +681,7 @@ async def create_profile(
     try:
         await s3_client.upload_file(file_name=avatar_key, file_data=avatar_bytes)
     except S3FileUploadError as e:
-        print(f"Error uploading avatar to S3: {e}")
+        logger.error(f"S3 upload failed: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to upload avatar. Please try again later."

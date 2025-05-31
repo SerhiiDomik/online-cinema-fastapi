@@ -9,7 +9,7 @@ from security.interfaces import JWTAuthManagerInterface
 from security.token_manager import JWTAuthManager
 from storages import S3StorageInterface, S3StorageClient
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/users/login")
 
 
 def get_settings() -> BaseAppSettings:
@@ -27,7 +27,7 @@ def get_jwt_auth_manager(settings: Settings = Depends(get_settings)) -> JWTAuthM
     )
 
 
-def get_accounts_email_notificator(
+def get_users_email_notificator(
     settings: Settings = Depends(get_settings)
 ) -> EmailSenderInterface:
     return EmailSender(

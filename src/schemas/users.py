@@ -1,7 +1,7 @@
 from datetime import date
 from fastapi import UploadFile, Form, File, HTTPException
 from pydantic import BaseModel, EmailStr, field_validator, HttpUrl
-from database import accounts_validators
+from database import users_validators
 from validation import (
     validate_name,
     validate_image,
@@ -26,7 +26,7 @@ class BaseEmailPasswordSchema(BaseModel):
     @field_validator("password")
     @classmethod
     def validate_password(cls, value):
-        return accounts_validators.validate_password_strength(value)
+        return users_validators.validate_password_strength(value)
 
 
 class UserRegistrationRequestSchema(BaseEmailPasswordSchema):
