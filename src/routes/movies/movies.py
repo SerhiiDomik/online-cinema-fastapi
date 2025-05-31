@@ -1,6 +1,8 @@
 import uuid
+from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.security import HTTPBearer
 from sqlalchemy import select, func, or_, and_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +17,7 @@ from database.models import (
     CertificationModel,
 )
 from database.models.movies import CommentModel, MovieRatingModel, MovieReactionModel, ReactionEnum
-from routes.dependencies import get_current_user
+from routes.dependencies import get_current_user, parse_comment_with_replies_model
 from schemas.movies import (
     MovieListResponseSchema,
     MovieListItemSchema,
@@ -28,11 +30,13 @@ from schemas.movies import (
     ReactionRequest,
 )
 
+security = HTTPBearer()
+
 router = APIRouter()
 
 
 @router.get(
-    "/movies/",
+    "/",
     response_model=MovieListResponseSchema,
     summary="Get a paginated list of movies",
     responses={
@@ -106,9 +110,15 @@ async def get_movie_list(
     else:
         stmt = stmt.order_by(MovieModel.year.desc())
 
+    stmt = stmt.options(
+        joinedload(MovieModel.certification),
+        selectinload(MovieModel.genres),
+        selectinload(MovieModel.directors),
+        selectinload(MovieModel.stars)
+    )
+
     count_stmt = select(func.count(MovieModel.id))
-    result_count = await db.execute(count_stmt)
-    total_items = result_count.scalar() or 0
+    total_items = (await db.execute(count_stmt)).scalar() or 0
 
     if not total_items:
         raise HTTPException(status_code=404, detail="No movies found.")
@@ -119,31 +129,23 @@ async def get_movie_list(
     if not movies:
         raise HTTPException(status_code=404, detail="No movies found.")
 
-    total_pages = (total_items + per_page - 1) // per_page
-
-    stmt = stmt.offset((page - 1) * per_page).limit(per_page)
-    result = await db.execute(stmt.options(
-        joinedload(MovieModel.certification),
-        selectinload(MovieModel.genres),
-        selectinload(MovieModel.directors),
-        selectinload(MovieModel.stars)
-    ))
+    paginated_stmt = stmt.offset((page - 1) * per_page).limit(per_page)
+    result = await db.execute(paginated_stmt)
     movies = result.unique().scalars().all()
 
-    response = MovieListResponseSchema(
-        movies=[MovieListItemSchema.model_validate(movie) for movie in movies],
-        prev_page=f"/movies/?page={page - 1}&per_page={per_page}" if page > 1 else None,
-        next_page=f"/movies/?page={page + 1}&per_page={per_page}" if page < total_pages else None,
-        total_pages=total_pages,
+    return MovieListResponseSchema(
+        movies=[MovieListItemSchema.model_validate(movie, from_attributes=True) for movie in movies],
         total_items=total_items,
+        total_pages=(total_items + per_page - 1) // per_page,
+        current_page=page
     )
-    return response
 
 
 @router.post(
-    "/movies/",
+    "/",
     response_model=MovieDetailSchema,
     summary="Add a new movie",
+    dependencies=[Depends(security)],
     responses={
         201: {
             "description": "Movie created successfully.",
@@ -238,16 +240,33 @@ async def create_movie(
 
         db.add(movie)
         await db.commit()
-        await db.refresh(movie)
-        return MovieDetailSchema.model_validate(movie)
+
+        stmt = (
+            select(MovieModel)
+            .where(MovieModel.id == movie.id)
+            .options(
+                selectinload(MovieModel.genres),
+                selectinload(MovieModel.directors),
+                selectinload(MovieModel.stars),
+                selectinload(MovieModel.certification),
+                selectinload(MovieModel.comments).joinedload(CommentModel.user),
+            )
+        )
+        result = await db.execute(stmt)
+        movie_with_relations = result.scalar_one()
+
+        return MovieDetailSchema.model_validate(movie_with_relations, from_attributes=True)
 
     except IntegrityError:
         await db.rollback()
-        raise HTTPException(status_code=400, detail="Invalid input data.")
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid input data."
+        )
 
 
 @router.get(
-    "/movies/{movie_id}/",
+    "/{movie_id}/",
     response_model=MovieDetailSchema,
     summary="Get movie details by ID",
     responses={
@@ -273,57 +292,51 @@ async def get_movie_by_id(
             selectinload(MovieModel.genres),
             selectinload(MovieModel.directors),
             selectinload(MovieModel.stars),
-            selectinload(MovieModel.comments).joinedload(CommentModel.user),
+            selectinload(MovieModel.comments)
+            .joinedload(CommentModel.user),
+            selectinload(MovieModel.comments)
+            .selectinload(CommentModel.replies)
+            .joinedload(CommentModel.user),
+            selectinload(MovieModel.comments)
+            .selectinload(CommentModel.reactions),
+            selectinload(MovieModel.reactions),
+            selectinload(MovieModel.ratings)
         )
     )
-    movie = result.scalar_one_or_none()
+
+    movie = result.unique().scalar_one_or_none()
 
     if not movie:
         raise HTTPException(status_code=404, detail="Movie not found")
 
-    for comment in movie.comments:
-        comment.user_email = comment.user.email
+    likes_count = len([r for r in movie.reactions if r.reaction == ReactionEnum.LIKE])
+    dislikes_count = len([r for r in movie.reactions if r.reaction == ReactionEnum.DISLIKE])
 
-    likes_result = await db.execute(
-        select(func.count()).where(
-            and_(
-                MovieReactionModel.movie_id == movie_id,
-                MovieReactionModel.reaction == ReactionEnum.LIKE
-            )
-        )
+    avg_rating = sum(r.rating for r in movie.ratings) / len(movie.ratings) if movie.ratings else None
+
+    comments_data = [
+        parse_comment_with_replies_model(comment)
+        for comment in movie.comments
+        if comment.parent_id is None
+    ]
+
+    movie_data = movie.__dict__.copy()
+    movie_data.pop("comments", None)
+    movie_data.pop("_sa_instance_state", None)
+
+    return MovieDetailSchema(
+        **movie_data,
+        likes_count=likes_count,
+        dislikes_count=dislikes_count,
+        average_rating=round(avg_rating, 1) if avg_rating else None,
+        comments=comments_data
     )
-    likes_count = likes_result.scalar() or 0
-
-    dislikes_result = await db.execute(
-        select(func.count()).where(
-            and_(
-                MovieReactionModel.movie_id == movie_id,
-                MovieReactionModel.reaction == ReactionEnum.DISLIKE
-            )
-        )
-    )
-    dislikes_count = dislikes_result.scalar() or 0
-
-    avg_rating_result = await db.execute(
-        select(func.avg(MovieRatingModel.rating)).where(
-            MovieRatingModel.movie_id == movie_id
-        )
-    )
-    avg_rating = avg_rating_result.scalar()
-    if avg_rating:
-        avg_rating = round(float(avg_rating), 1)
-
-    movie_detail = MovieDetailSchema.model_validate(movie)
-    movie_detail.likes_count = likes_count
-    movie_detail.dislikes_count = dislikes_count
-    movie_detail.average_rating = avg_rating
-
-    return movie_detail
 
 
 @router.delete(
-    "/movies/{movie_id}/",
+    "/{movie_id}/",
     summary="Delete a movie by ID",
+    dependencies=[Depends(security)],
     responses={
         204: {
             "description": "Movie deleted successfully."
@@ -361,8 +374,9 @@ async def delete_movie(
 
 
 @router.patch(
-    "/movies/{movie_id}/",
+    "/{movie_id}/",
     summary="Update a movie by ID",
+    dependencies=[Depends(security)],
     responses={
         200: {
             "description": "Movie updated successfully.",
@@ -393,7 +407,12 @@ async def update_movie(
         .options(
             selectinload(MovieModel.genres),
             selectinload(MovieModel.directors),
-            selectinload(MovieModel.stars)
+            selectinload(MovieModel.stars),
+            selectinload(MovieModel.comments)
+            .selectinload(CommentModel.user),
+            selectinload(MovieModel.comments)
+            .selectinload(CommentModel.replies)
+            .selectinload(CommentModel.user),
         )
     )
     movie = result.scalar_one_or_none()
@@ -458,12 +477,13 @@ async def update_movie(
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
-    return MovieDetailSchema.model_validate(movie)
+    return MovieDetailSchema.model_validate(movie, from_attributes=True)
 
 
 @router.post(
-    "/movies/{movie_id}/comments",
+    "/{movie_id}/comments",
     response_model=CommentSchema,
+    dependencies=[Depends(security)],
     status_code=status.HTTP_201_CREATED,
     responses={
         200: {
@@ -498,7 +518,12 @@ async def create_comment(
     try:
         db.add(comment)
         await db.commit()
-        await db.refresh(comment)
+        await db.refresh(comment, ["user", "replies", "reactions"])
+
+        if not comment.user:
+            comment.user = current_user
+        comment.user_email = current_user.email
+
     except IntegrityError:
         await db.rollback()
         raise HTTPException(
@@ -511,7 +536,7 @@ async def create_comment(
 
 
 @router.get(
-    "/movies/{movie_id}/comments",
+    "/{movie_id}/comments",
     response_model=list[CommentSchema],
     responses={
         404: {
@@ -524,36 +549,71 @@ async def create_comment(
         }
     }
 )
-@router.get("/{movie_id}/comments", response_model=list[CommentSchema])
+@router.get(
+    "/{movie_id}/comments",
+    response_model=list[CommentSchema],
+    operation_id="get_movie_comments",
+    responses={
+        404: {
+            "description": "Comment not found.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Comments with the given ID was not found."}
+                }
+            },
+        }
+    }
+)
 async def get_comments(
-    movie_id: int,
-    db: AsyncSession = Depends(get_db),
+        movie_id: int,
+        db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
         select(CommentModel)
         .where(CommentModel.movie_id == movie_id)
-        .where(CommentModel.parent_id == None)
         .options(
             joinedload(CommentModel.user),
-            joinedload(CommentModel.replies).joinedload(CommentModel.user),
-            joinedload(CommentModel.reactions)
+            selectinload(CommentModel.reactions)
         )
-        .order_by(CommentModel.created_at.desc())
     )
+
     comments = result.unique().scalars().all()
 
-    def process_comment(comment):
-        comment.likes_count = sum(1 for r in comment.reactions if r.reaction == ReactionEnum.LIKE)
-        comment.dislikes_count = sum(1 for r in comment.reactions if r.reaction == ReactionEnum.DISLIKE)
-        comment.user_email = comment.user.email
-        for reply in comment.replies:
-            process_comment(reply)
-        return comment
+    comment_dict = defaultdict(list)
+    id_to_comment = {}
+    for comment in comments:
+        comment_dict[comment.parent_id].append(comment.id)
+        id_to_comment[comment.id] = {
+            "id": comment.id,
+            "content": comment.content,
+            "created_at": comment.created_at,
+            "user_id": comment.user_id,
+            "movie_id": comment.movie_id,
+            "parent_id": comment.parent_id,
+            "user_email": comment.user.email,
+            "likes_count": sum(1 for r in comment.reactions if r.reaction == ReactionEnum.LIKE),
+            "dislikes_count": sum(1 for r in comment.reactions if r.reaction == ReactionEnum.DISLIKE),
+            "replies": []
+        }
 
-    return [process_comment(c) for c in comments]
+    def build_comment_tree(parent_id=None):
+        tree = []
+        for comment_id in comment_dict.get(parent_id, []):
+            comment_data = id_to_comment[comment_id]
+            comment_data["replies"] = build_comment_tree(comment_id)
+            tree.append(comment_data)
+        return tree
+
+    comment_tree = build_comment_tree()
+
+    return comment_tree
 
 
-@router.post("/movies/{movie_id}/reaction", status_code=status.HTTP_200_OK)
+@router.post(
+    "/{movie_id}/reaction",
+    dependencies=[Depends(security)],
+    status_code=status.HTTP_200_OK
+)
 async def set_movie_reaction(
     movie_id: int,
     reaction_data: ReactionRequest,
@@ -595,7 +655,11 @@ async def set_movie_reaction(
     return {"detail": "Reaction updated"}
 
 
-@router.post("/movies/{movie_id}/rate", status_code=status.HTTP_200_OK)
+@router.post(
+    "/{movie_id}/rate",
+    dependencies=[Depends(security)],
+    status_code=status.HTTP_200_OK
+)
 async def rate_movie(
     movie_id: int,
     rating_data: RatingRequest,

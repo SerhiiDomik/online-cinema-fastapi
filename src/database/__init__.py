@@ -10,7 +10,7 @@ from database.models.users import (
     RefreshTokenModel,
     UserProfileModel
 )
-from database.validators import accounts as accounts_validators
+from database.validators import users as users_validators
 
 environment = os.getenv("ENVIRONMENT", "developing")
 

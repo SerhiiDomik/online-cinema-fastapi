@@ -12,7 +12,7 @@ from sqlalchemy import (
     ForeignKey,
     Table,
     Column,
-    func
+    func, DateTime
 )
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 
@@ -64,6 +64,7 @@ class FavoriteMoviesModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     movie_id: Mapped[int] = mapped_column(ForeignKey("movies.id", ondelete="CASCADE"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (
         UniqueConstraint('user_id', 'movie_id', name='unique_user_movie_favorite'),
@@ -177,9 +178,19 @@ class MovieModel(Base):
     description: Mapped[str] = mapped_column(Text, nullable=False)
     price: Mapped[Decimal] = mapped_column(DECIMAL(10, 2), nullable=False)
     certification_id: Mapped[int] = mapped_column(ForeignKey("certifications.id"), nullable=False)
-    comments: Mapped[list["CommentModel"]] = relationship(back_populates="movie")
-    reactions: Mapped[list["MovieReactionModel"]] = relationship(back_populates="movie")
-    ratings: Mapped[list["MovieRatingModel"]] = relationship(back_populates="movie")
+    comments: Mapped[list["CommentModel"]] = relationship(
+        "CommentModel",
+        back_populates="movie",
+        cascade="all, delete-orphan",
+    )
+    reactions: Mapped[list["MovieReactionModel"]] = relationship(
+        back_populates="movie",
+        cascade="all, delete-orphan",
+    )
+    ratings: Mapped[list["MovieRatingModel"]] = relationship(
+        back_populates="movie",
+        cascade="all, delete-orphan",
+    )
 
     certification: Mapped["CertificationModel"] = relationship(
         "CertificationModel",
@@ -205,7 +216,8 @@ class MovieModel(Base):
     )
 
     favorited_by_users: Mapped[list["FavoriteMoviesModel"]] = relationship(
-        back_populates="movie"
+        back_populates="movie",
+        cascade="all, delete-orphan",
     )
 
     __table_args__ = (
@@ -227,14 +239,30 @@ class CommentModel(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    movie_id: Mapped[int] = mapped_column(ForeignKey("movies.id", ondelete="CASCADE"), nullable=False)
-    parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey("comments.id", ondelete="CASCADE"))
+    movie_id: Mapped[int] = mapped_column(ForeignKey("movies.id", ondelete="CASCADE"))
+    parent_id: Mapped[Optional[int]] = mapped_column(ForeignKey("comments.id", ondelete="CASCADE"), nullable=True)
 
-    user: Mapped["User"] = relationship(back_populates="comments")
-    movie: Mapped["MovieModel"] = relationship(back_populates="comments")
-    replies: Mapped[list["CommentModel"]] = relationship(back_populates="parent")
-    parent: Mapped[Optional["CommentModel"]] = relationship(back_populates="replies", remote_side=[id])
-    reactions: Mapped[list["CommentReactionModel"]] = relationship(back_populates="comment")
+    user: Mapped["User"] = relationship("User", back_populates="comments", lazy="joined")
+    movie: Mapped["MovieModel"] = relationship(
+        "MovieModel",
+        back_populates="comments",
+    )
+    parent: Mapped[Optional["CommentModel"]] = relationship(
+        back_populates="replies",
+        remote_side=[id]
+    )
+    replies: Mapped[list["CommentModel"]] = relationship(
+        "CommentModel",
+        back_populates="parent",
+        lazy="selectin",
+        cascade="all, delete-orphan"
+    )
+    reactions: Mapped[list["CommentReactionModel"]] = relationship(
+        "CommentReactionModel",
+        back_populates="comment",
+        lazy="selectin",
+        cascade="all, delete-orphan"
+    )
 
 
 class CommentReactionModel(Base):

@@ -1,8 +1,9 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional, List, Literal
+from typing import Optional, List
 from pydantic import BaseModel, Field, field_validator
 
+from database.models.movies import ReactionEnum
 from schemas.examples.movies import (
     certification_example,
     genre_example,
@@ -12,7 +13,6 @@ from schemas.examples.movies import (
     movie_list_item_example,
     movie_detail_example,
     movie_list_response_example,
-    genre_list_example
 )
 
 
@@ -27,20 +27,16 @@ class CommentSchema(CommentCreate):
     movie_id: int
     user_email: str
     parent_id: Optional[int] = None
-    replies: List["CommentSchema"] = []
     likes_count: int = 0
     dislikes_count: int = 0
+    replies: List["CommentSchema"] = []
 
     class Config:
         from_attributes = True
 
 
-class CommentReactionRequest(BaseModel):
-    reaction: Optional[Literal["like", "dislike"]] = None
-
-
 class ReactionRequest(BaseModel):
-    reaction: Optional[Literal["like", "dislike"]] = None
+    reaction: Optional[ReactionEnum] = None
 
 
 class RatingRequest(BaseModel):
@@ -133,10 +129,10 @@ class MovieUpdateSchema(BaseModel):
 class MovieListItemSchema(MovieBaseSchema):
     id: int
     uuid: str
-    certification: CertificationSchema
-    genres: List[GenreSchema]
-    directors: List[DirectorSchema]
-    stars: List[StarSchema]
+    certification: Optional[CertificationSchema]
+    genres: List[GenreSchema] = []
+    directors: List[DirectorSchema] = []
+    stars: List[StarSchema] = []
 
     class Config:
         from_attributes = True
@@ -146,7 +142,7 @@ class MovieListItemSchema(MovieBaseSchema):
 class MovieDetailSchema(MovieListItemSchema):
     meta_score: Optional[float]
     gross: Optional[float]
-    comments: list[CommentSchema]
+    comments: List[CommentSchema]
     likes_count: int = 0
     dislikes_count: int = 0
     average_rating: Optional[float] = None
@@ -165,14 +161,6 @@ class MovieListResponseSchema(BaseModel):
         json_schema_extra = {"example": movie_list_response_example}
 
 
-class GenreListSchema(BaseModel):
-    genres: List[GenreSchema]
-    total: int
-
-    class Config:
-        json_schema_extra = {"example": genre_list_example}
-
-
 class FavoriteMovieSchema(MovieListItemSchema):
     favorited_at: datetime
 
@@ -182,3 +170,31 @@ class FavoriteListResponseSchema(BaseModel):
     total_pages: int
     total_items: int
     current_page: int
+
+
+class GenreCreateSchema(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+
+    class Config:
+        json_schema_extra = {"example": {"name": "Action"}}
+
+
+class GenreReadSchema(BaseModel):
+    id: int
+    name: str
+    movie_count: int
+    movie_ids: List[int]
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "id": 1,
+                "name": "Action",
+                "movie_count": 3,
+                "movie_ids": [101, 102, 103]
+            }
+        }
+
+
+CommentSchema.update_forward_refs()

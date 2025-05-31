@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.security import HTTPBearer
 from sqlalchemy import select, func, or_, and_, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
@@ -11,10 +12,13 @@ from schemas.movies import FavoriteListResponseSchema, FavoriteMovieSchema
 
 router = APIRouter()
 
+security = HTTPBearer()
+
 
 @router.post(
     "/{movie_id}",
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(security)],
     summary="Add movie to favorites"
 )
 async def add_to_favorites(
@@ -47,6 +51,7 @@ async def add_to_favorites(
 @router.delete(
     "/{movie_id}",
     status_code=status.HTTP_200_OK,
+    dependencies=[Depends(security)],
     summary="Remove movie from favorites"
 )
 async def remove_from_favorites(
@@ -72,6 +77,7 @@ async def remove_from_favorites(
 @router.get(
     "/",
     response_model=FavoriteListResponseSchema,
+    dependencies=[Depends(security)],
     summary="Get favorite movies"
 )
 async def get_favorites(
@@ -88,7 +94,10 @@ async def get_favorites(
         current_user: User = Depends(get_current_user),
 ):
     stmt = (
-        select(MovieModel)
+        select(
+            MovieModel,
+            FavoriteMoviesModel.created_at.label("favorited_at")
+        )
         .join(FavoriteMoviesModel)
         .where(FavoriteMoviesModel.user_id == current_user.id)
     )
@@ -142,16 +151,27 @@ async def get_favorites(
 
     stmt = stmt.offset((page - 1) * per_page).limit(per_page)
 
-    result = await db.execute(stmt.options(
-        joinedload(MovieModel.certification),
-        selectinload(MovieModel.genres),
-        selectinload(MovieModel.directors),
-        selectinload(MovieModel.stars)
-    ))
-    movies = result.unique().scalars().all()
+    result = await db.execute(
+        stmt.options(
+            joinedload(MovieModel.certification),
+            selectinload(MovieModel.genres),
+            selectinload(MovieModel.directors),
+            selectinload(MovieModel.stars)
+        )
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+    )
+
+    movies_with_dates = result.unique().tuples().all()
 
     return FavoriteListResponseSchema(
-        movies=[FavoriteMovieSchema.model_validate(movie) for movie in movies],
+        movies=[
+            FavoriteMovieSchema(
+                **movie[0].__dict__,
+                favorited_at=movie[1]
+            )
+            for movie in movies_with_dates
+        ],
         total_items=total_items,
         total_pages=(total_items + per_page - 1) // per_page,
         current_page=page
