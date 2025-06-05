@@ -20,6 +20,7 @@ services:
       - MINIO_HOST=minio-cinema-test
       - MINIO_PORT=9000
       - MINIO_STORAGE=cinema-storage
+      - PYTHONUNBUFFERED=1
     depends_on:
       mailhog:
         condition: service_started
@@ -56,7 +57,7 @@ services:
       - minio_data_test:/data
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
-      interval: 10s
+      interval: 5s
       timeout: 5s
       retries: 5
     networks:
