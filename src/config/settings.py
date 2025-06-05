@@ -59,4 +59,3 @@ class TestingSettings(Settings):
     JWT_SIGNING_ALGORITHM: str = "HS256"
     PATH_TO_DB: str = ":memory:"
     MAILHOG_API_PORT: int = 8025
-

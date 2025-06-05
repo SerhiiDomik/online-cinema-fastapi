@@ -5,8 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from config.dependencies import oauth2_scheme, get_jwt_auth_manager
 from database import User
 from database.models.movies import CommentModel, ReactionEnum
-from database.session_postgresql import get_postgresql_db
-from database.session_sqlite import get_sqlite_db
+from database import get_db
 from schemas.movies import CommentSchema
 from security.interfaces import JWTAuthManagerInterface
 
@@ -14,7 +13,7 @@ from security.interfaces import JWTAuthManagerInterface
 async def get_current_user(
         token: str = Depends(oauth2_scheme),
         jwt_auth: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
-        db: AsyncSession = Depends(get_sqlite_db)
+        db: AsyncSession = Depends(get_db)
 ) -> User:
 
     credentials_exception = HTTPException(

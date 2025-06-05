@@ -426,6 +426,7 @@ async def update_movie(
             selectinload(MovieModel.genres),
             selectinload(MovieModel.directors),
             selectinload(MovieModel.stars),
+            selectinload(MovieModel.certification),
             selectinload(MovieModel.comments)
             .selectinload(CommentModel.user),
             selectinload(MovieModel.comments)
