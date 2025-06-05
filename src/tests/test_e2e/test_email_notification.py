@@ -15,11 +15,9 @@ from database import (
     PasswordResetTokenModel, MovieModel
 )
 
-
 TEST_EMAIL = "test@email.com"
 TEST_PASSWORD = "StrongPassword123!"
 NEW_PASSWORD = "NewSecurePassword123!"
-MAILHOG_API_PORT = 8025
 
 @pytest.mark.e2e
 @pytest.mark.order(1)
@@ -401,37 +399,19 @@ async def test_send_comment_reaction_email(
         e2e_db_session,
         settings,
         create_activated_user_with_token,
-        create_movie,
+        create_movies,
         default_user_group
 ):
-    user1, token1 = create_activated_user_with_token
-    user2, token2 = create_activated_user_with_token
-    movie = create_movie
-
-    print("\nCreated users:")
-    print(f"User1: ID={user1.id}, Email={user1.email}")
-    print(f"User2: ID={user2.id}, Email={user2.email}")
-
-    print("\nCreated movie:")
-    print(f"Movie ID: {movie.id}, Title: {movie.name}")
-
-    users_count = await e2e_db_session.execute(select(User))
-    print(f"\nTotal users in DB: {users_count.scalar()}")
-
-    movies_count = await e2e_db_session.execute(select(MovieModel))
-    print(f"Total movies in DB: {movies_count.scalar()}")
+    user1, token1 = await create_activated_user_with_token()
+    user2, token2 = await create_activated_user_with_token()
+    movies = await create_movies(1)
+    movie = movies[0]
 
     comment_data = {"content": "Nice movie!"}
     headers = {"Authorization": f"Bearer {token1}"}
 
-    responce_get_movies = await e2e_client.get(
-        f"/movies/",
-        headers=headers,
-    )
-    print(f"{responce_get_movies=}")
-
     response = await e2e_client.post(
-        f"/movies/1/comments/",
+        f"/movies/{movie.id}/comments/",
         json=comment_data,
         headers=headers
     )
@@ -454,7 +434,7 @@ async def test_send_comment_reaction_email(
 
     assert mailhog_response.status_code == 200
     messages = mailhog_response.json()["items"]
-    assert any("liked your comment" in m["Content"]["Headers"].get("Subject", [""])[0] for m in messages)
+    assert any("New Reaction to Your Comment" in m["Content"]["Headers"].get("Subject", [""])[0] for m in messages)
 
 
 @pytest.mark.e2e
@@ -465,11 +445,12 @@ async def test_send_comment_reply_email(
         e2e_db_session,
         settings,
         create_activated_user_with_token,
-        create_movie
+        create_movies,
 ):
-    user1, token1 = create_activated_user_with_token
-    user2, token2 = create_activated_user_with_token
-    movie = create_movie
+    user1, token1 = await create_activated_user_with_token()
+    user2, token2 = await create_activated_user_with_token()
+    movies = await create_movies(1)
+    movie = movies[0]
 
     comment_data = {"content": "This film is amazing!"}
     headers = {"Authorization": f"Bearer {token1}"}
@@ -497,4 +478,4 @@ async def test_send_comment_reply_email(
 
     assert mailhog_response.status_code == 200
     messages = mailhog_response.json()["items"]
-    assert any("replied to your comment" in m["Content"]["Headers"].get("Subject", [""])[0] for m in messages)
+    assert any("New Reply to Your Comment" in m["Content"]["Headers"].get("Subject", [""])[0] for m in messages)

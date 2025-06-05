@@ -232,37 +232,6 @@ async def create_user(e2e_db_session, default_user_group):
 
 
 @pytest_asyncio.fixture
-async def create_movie(e2e_db_session):
-
-    certification = CertificationModel(
-        id=1,
-        name=str(uuid.uuid4()),
-    )
-
-    movie = MovieModel(
-        id=1,
-        uuid=str(uuid.uuid4()),
-        name=f"Test Movie {uuid.uuid4()}",
-        year=2023,
-        time=120,
-        imdb=7.5,
-        votes=10000,
-        meta_score=75.0,
-        gross=150.0,
-        description="A test movie description.",
-        price=Decimal("9.99"),
-        certification_id=certification.id
-    )
-
-    e2e_db_session.add(certification)
-    await e2e_db_session.commit()
-    e2e_db_session.add(movie)
-    await e2e_db_session.commit()
-    await e2e_db_session.refresh(movie)
-    return movie
-
-
-@pytest_asyncio.fixture
 async def create_activated_user(e2e_db_session, default_user_group):
     email = f"{uuid.uuid4().hex[:4]}@email.com"
     user = User.create(
@@ -278,41 +247,33 @@ async def create_activated_user(e2e_db_session, default_user_group):
 
 
 @pytest_asyncio.fixture
-async def create_activated_user_with_token(e2e_client: AsyncClient, e2e_db_session, default_user_group):
-    email = f"{uuid.uuid4().hex[:4]}@email.com"
-    raw_password = "Password123!"
+def create_activated_user_with_token(e2e_client: AsyncClient, e2e_db_session, default_user_group):
+    async def _create_user():
+        email = f"{uuid.uuid4().hex[:4]}@email.com"
+        raw_password = "Password123!"
 
-    user = User.create(
-        email=email,
-        raw_password=raw_password,
-        group_id=default_user_group.id,
-    )
-    user.is_active = True
+        user = User.create(
+            email=email,
+            raw_password=raw_password,
+            group_id=default_user_group.id,
+        )
+        user.is_active = True
 
-    e2e_db_session.add(user)
-    await e2e_db_session.commit()
-    await e2e_db_session.refresh(user)
+        e2e_db_session.add(user)
+        await e2e_db_session.commit()
+        await e2e_db_session.refresh(user)
 
-    response = await e2e_client.post(
-        "/users/login/",
-        json={"email": email, "password": raw_password}
-    )
+        response = await e2e_client.post(
+            "/users/login/",
+            json={"email": email, "password": raw_password}
+        )
 
-    try:
-        response.raise_for_status()
-    except httpx.HTTPStatusError as e:
-        print(f"Login failed: {response.status_code}, body: {response.text}")
-        raise
-
-    try:
         tokens = response.json()
-    except Exception as e:
-        print(f"Failed to parse login response JSON. Status: {response.status_code}, Body: {response.text}")
-        raise
+        access_token = tokens["access_token"]
 
-    access_token = tokens["access_token"]
+        return user, access_token
 
-    return user, access_token
+    return _create_user
 
 
 @pytest_asyncio.fixture
