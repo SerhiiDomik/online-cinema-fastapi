@@ -1,6 +1,7 @@
 import re
 from datetime import date
 from io import BytesIO
+from urllib.parse import urlparse
 
 from PIL import Image
 from fastapi import UploadFile
@@ -43,3 +44,10 @@ def validate_birth_date(birth_date: date) -> None:
     age = (date.today() - birth_date).days // 365
     if age < 18:
         raise ValueError('You must be at least 18 years old to register.')
+
+def validate_url(url: str) -> bool:
+    try:
+        result = urlparse(url)
+        return all([result.scheme in ("http", "https"), result.netloc])
+    except Exception as e:
+        print(e)

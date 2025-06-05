@@ -232,8 +232,9 @@ async def resend_activation_token(
     user = result.scalars().first()
 
     if not user:
-        return MessageResponseSchema(
-            message="If the email is registered, a new activation token will be sent"
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="User account is not found"
         )
 
     if user.is_active:

@@ -1,9 +1,10 @@
 import uuid
 from collections import defaultdict
+from typing import List, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security import HTTPBearer
-from sqlalchemy import select, func, or_, and_
+from sqlalchemy import select, func, or_, and_, distinct
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
@@ -51,12 +52,12 @@ router = APIRouter()
     }
 )
 async def get_movie_list(
-        page: int = Query(1, ge=1, description="Page number (1-based index)"),
-        per_page: int = Query(10, ge=1, le=20, description="Number of items per page"),
+        page: int = Query(1, ge=1),
+        per_page: int = Query(10, ge=1, le=20),
         year: int = None,
         min_rating: float = Query(None, ge=0, le=10),
         max_rating: float = Query(None, ge=0, le=10),
-        genre: str = None,
+        genre: Union[List[str], None] = Query(None),
         certification: str = None,
         sort_by: str = Query(None, description="Sort by: price, year, imdb, votes"),
         search: str = None,
@@ -65,7 +66,7 @@ async def get_movie_list(
     stmt = select(MovieModel).distinct()
 
     if year:
-        stmt = stmt.where(MovieModel.year == year)
+        stmt = stmt.where(MovieModel.year == int(year))
 
     if min_rating is not None:
         stmt = stmt.where(MovieModel.imdb >= min_rating)
@@ -74,7 +75,17 @@ async def get_movie_list(
         stmt = stmt.where(MovieModel.imdb <= max_rating)
 
     if genre:
-        stmt = stmt.join(MovieModel.genres).where(GenreModel.name == genre)
+        genre_names = []
+        for g in genre:
+            genre_names.extend([name.strip() for name in g.split(",")])
+        genre_names = list(set(genre_names))
+
+        stmt = (
+            stmt.join(MovieModel.genres)
+            .where(GenreModel.name.in_(genre_names))
+            .group_by(MovieModel.id)
+            .having(func.count(distinct(GenreModel.name)) == len(genre_names))
+        )
 
     if certification:
         stmt = stmt.join(MovieModel.certification).where(CertificationModel.name == certification)
@@ -108,7 +119,7 @@ async def get_movie_list(
         else:
             stmt = stmt.order_by(sort_field.asc())
     else:
-        stmt = stmt.order_by(MovieModel.year.desc())
+        stmt = stmt.order_by(MovieModel.id.desc())
 
     stmt = stmt.options(
         joinedload(MovieModel.certification),
@@ -117,7 +128,7 @@ async def get_movie_list(
         selectinload(MovieModel.stars)
     )
 
-    count_stmt = select(func.count(MovieModel.id))
+    count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
     total_items = (await db.execute(count_stmt)).scalar() or 0
 
     if not total_items:
@@ -133,10 +144,17 @@ async def get_movie_list(
     result = await db.execute(paginated_stmt)
     movies = result.unique().scalars().all()
 
+    total_pages = (total_items + per_page - 1) // per_page
+
+    if page > total_pages != 0:
+        raise HTTPException(status_code=404, detail="No movies found.")
+
     return MovieListResponseSchema(
         movies=[MovieListItemSchema.model_validate(movie, from_attributes=True) for movie in movies],
         total_items=total_items,
-        total_pages=(total_items + per_page - 1) // per_page,
+        total_pages=total_pages,
+        prev_page=f"/movies/?page={page - 1}&per_page={per_page}" if page > 1 else None,
+        next_page=f"/movies/?page={page + 1}&per_page={per_page}" if page < total_pages else None,
         current_page=page
     )
 
@@ -481,7 +499,7 @@ async def update_movie(
 
 
 @router.post(
-    "/{movie_id}/comments",
+    "/{movie_id}/comments/",
     response_model=CommentSchema,
     dependencies=[Depends(security)],
     status_code=status.HTTP_201_CREATED,
@@ -536,7 +554,7 @@ async def create_comment(
 
 
 @router.get(
-    "/{movie_id}/comments",
+    "/{movie_id}/comments/",
     response_model=list[CommentSchema],
     responses={
         404: {
@@ -550,7 +568,7 @@ async def create_comment(
     }
 )
 @router.get(
-    "/{movie_id}/comments",
+    "/{movie_id}/comments/",
     response_model=list[CommentSchema],
     operation_id="get_movie_comments",
     responses={
@@ -610,7 +628,7 @@ async def get_comments(
 
 
 @router.post(
-    "/{movie_id}/reaction",
+    "/{movie_id}/reaction/",
     dependencies=[Depends(security)],
     status_code=status.HTTP_200_OK
 )
@@ -656,7 +674,7 @@ async def set_movie_reaction(
 
 
 @router.post(
-    "/{movie_id}/rate",
+    "/{movie_id}/rate/",
     dependencies=[Depends(security)],
     status_code=status.HTTP_200_OK
 )

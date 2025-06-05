@@ -177,6 +177,11 @@ class TokenBaseModel(Base):
         nullable=False,
         default=lambda: datetime.now(timezone.utc) + timedelta(days=1)
     )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc)
+    )
 
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
 

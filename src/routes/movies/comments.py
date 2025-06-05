@@ -19,7 +19,7 @@ security = HTTPBearer()
 
 
 @router.post(
-    "/{comment_id}/reply",
+    "/{comment_id}/reply/",
     response_model=CommentSchema,
     dependencies=[Depends(security)],
     status_code=status.HTTP_201_CREATED)
@@ -60,7 +60,7 @@ async def reply_to_comment(
 
 
 @router.post(
-    "/{comment_id}/reaction",
+    "/{comment_id}/reaction/",
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(security)],
 )

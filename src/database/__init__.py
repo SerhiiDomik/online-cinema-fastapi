@@ -10,7 +10,12 @@ from database.models.users import (
     RefreshTokenModel,
     UserProfileModel
 )
+from database.models.movies import (
+    MovieModel,
+    GenreModel,
+)
 from database.validators import users as users_validators
+
 
 environment = os.getenv("ENVIRONMENT", "developing")
 
