@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, distinct
+from sqlalchemy.orm import selectinload
 
 from database import get_db
 from database.models import GenreModel, MovieModel
@@ -19,30 +20,24 @@ security = HTTPBearer()
     response_model=List[GenreReadSchema]
 )
 async def get_genres(db: AsyncSession = Depends(get_db)):
-    stmt = (
-        select(
-            GenreModel.id,
-            GenreModel.name,
-            func.count(distinct(MovieModel.id)).label("movie_count"),
-            func.array_agg(distinct(MovieModel.id)).label("movie_ids")
-        )
-        .outerjoin(GenreModel.movies)
-        .group_by(GenreModel.id, GenreModel.name)
-        .order_by(GenreModel.name)
+    result = await db.execute(
+        select(GenreModel).options(selectinload(GenreModel.movies))
     )
+    genres = result.scalars().all()
 
-    result = await db.execute(stmt)
-    genres_data = result.all()
+    response = []
+    for genre in genres:
+        movie_ids = [movie.id for movie in genre.movies] if genre.movies else []
 
-    return [
-        GenreReadSchema(
-            id=genre_id,
-            name=name,
-            movie_count=movie_count,
-            movie_ids=movie_ids if movie_ids[0] is not None else []
+        response.append(
+            GenreReadSchema(
+                id=genre.id,
+                name=genre.name,
+                movie_count=len(movie_ids),
+                movie_ids=movie_ids,
+            )
         )
-        for genre_id, name, movie_count, movie_ids in genres_data
-    ]
+    return response
 
 
 @router.post(
