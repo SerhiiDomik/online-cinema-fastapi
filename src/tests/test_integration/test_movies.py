@@ -5,13 +5,15 @@ import pytest
 from sqlalchemy import select, func
 from sqlalchemy.orm import joinedload, selectinload
 
-from database import MovieModel
-from database import (
+from database.models.movies import (
+    MovieModel,
     GenreModel,
-
+    StarModel,
+    DirectorModel,
+    CommentModel,
+    MovieReactionModel,
+    MovieRatingModel,
 )
-from database.models import StarModel, DirectorModel
-from database.models.movies import CommentModel
 
 
 @pytest.mark.asyncio
@@ -42,7 +44,7 @@ async def test_get_movies_default_parameters(client, create_movies):
     assert response_data["total_pages"] > 0, "Expected total_pages > 0, but got a non-positive value"
     assert response_data["total_items"] > 0, "Expected total_items > 0, but got a non-positive value"
 
-    assert response_data["prev_page"] is None is None, "Expected prev_page to be None on the first page, but got a value"
+    assert response_data["prev_page"] is None, "Expected prev_page to be None on the first page, but got a value"
 
     if response_data["total_pages"] > 1:
         assert response_data["next_page"] is not None, (
@@ -544,7 +546,7 @@ async def test_create_movie_and_related_models(client, db_session, create_activa
     (genres, actors, languages) are created if they do not exist.
     """
 
-    user, token = create_activated_user_with_token
+    user, token = await create_activated_user_with_token()
     headers = {"Authorization": f"Bearer {token}"}
 
     movie_data = {
@@ -596,7 +598,7 @@ async def test_create_movie_duplicate_error(client, db_session, create_activated
     results in a 409 conflict error.
     """
 
-    user, token = create_activated_user_with_token
+    user, token = await create_activated_user_with_token()
     headers = {"Authorization": f"Bearer {token}"}
 
     movie_data = {
@@ -625,95 +627,359 @@ async def test_create_movie_duplicate_error(client, db_session, create_activated
     assert "detail" in data
     assert data["detail"] == "Movie with these attributes already exists"
 
-#
-# @pytest.mark.asyncio
-# async def test_delete_movie_success(client, db_session, ):
-#     """
-#     Test the `/movies/{movie_id}/` endpoint for successful movie deletion.
-#     """
-#     stmt = select(MovieModel).limit(1)
-#     result = await db_session.execute(stmt)
-#     movie = result.scalars().first()
-#     assert movie is not None, "No movies found in the database to delete."
-#
-#     movie_id = movie.id
-#
-#     response = await client.delete(f"/movies/{movie_id}/")
-#     assert response.status_code == 204, f"Expected status code 204, but got {response.status_code}"
-#
-#     stmt_check = select(MovieModel).where(MovieModel.id == movie_id)
-#     result_check = await db_session.execute(stmt_check)
-#     deleted_movie = result_check.scalars().first()
-#     assert deleted_movie is None, f"Movie with ID {movie_id} was not deleted."
-#
-#
-# @pytest.mark.asyncio
-# async def test_delete_movie_not_found(client):
-#     """
-#     Test the `/movies/{movie_id}/` endpoint with a non-existent movie ID.
-#     """
-#     non_existent_id = 99999
-#
-#     response = await client.delete(f"/movies/{non_existent_id}/")
-#     assert response.status_code == 404, f"Expected status code 404, but got {response.status_code}"
-#
-#     response_data = response.json()
-#     expected_detail = "Movie with the given ID was not found."
-#     assert response_data["detail"] == expected_detail, (
-#         f"Expected detail message: {expected_detail}, but got: {response_data['detail']}"
-#     )
-#
-#
-# @pytest.mark.asyncio
-# async def test_update_movie_success(client, db_session, ):
-#     """
-#     Test the `/movies/{movie_id}/` endpoint for successfully updating a movie's details.
-#     """
-#     stmt = select(MovieModel).limit(1)
-#     result = await db_session.execute(stmt)
-#     movie = result.scalars().first()
-#     assert movie is not None, "No movies found in the database to update."
-#
-#     movie_id = movie.id
-#     update_data = {
-#         "name": "Updated Movie Name",
-#         "score": 95.0,
-#     }
-#
-#     response = await client.patch(f"/movies/{movie_id}/", json=update_data)
-#     assert response.status_code == 200, f"Expected status code 200, but got {response.status_code}"
-#
-#     response_data = response.json()
-#     assert response_data["detail"] == "Movie updated successfully.", (
-#         f"Expected detail message: 'Movie updated successfully.', but got: {response_data['detail']}"
-#     )
-#
-#     await db_session.rollback()
-#
-#     stmt_check = select(MovieModel).where(MovieModel.id == movie_id)
-#     result_check = await db_session.execute(stmt_check)
-#     updated_movie = result_check.scalars().first()
-#
-#     assert updated_movie.name == update_data["name"], "Movie name was not updated."
-#     assert updated_movie.score == update_data["score"], "Movie score was not updated."
-#
-#
-# @pytest.mark.asyncio
-# async def test_update_movie_not_found(client):
-#     """
-#     Test the `/movies/{movie_id}/` endpoint with a non-existent movie ID.
-#     """
-#     non_existent_id = 99999
-#     update_data = {
-#         "name": "Non-existent Movie",
-#         "score": 90.0
-#     }
-#
-#     response = await client.patch(f"/movies/{non_existent_id}/", json=update_data)
-#     assert response.status_code == 404, f"Expected status code 404, but got {response.status_code}"
-#
-#     response_data = response.json()
-#     expected_detail = "Movie with the given ID was not found."
-#     assert response_data["detail"] == expected_detail, (
-#         f"Expected detail message: {expected_detail}, but got: {response_data['detail']}"
-#     )
+
+@pytest.mark.asyncio
+async def test_delete_movie_success(client, db_session, create_movies, create_activated_user_with_token):
+    """
+    Test the `/movies/{movie_id}/` endpoint for successful movie deletion.
+    """
+    movies = await create_movies(1)
+    movie_id  = movies[0].id
+
+    user, access_token = await create_activated_user_with_token()
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    response = await client.delete(f"/movies/{movie_id}/", headers=headers)
+    assert response.status_code == 204, f"Expected status code 204, but got {response.status_code}"
+
+    assert response.content == b"", "Response content should be empty for 204 No Content"
+
+    stmt_check = select(MovieModel).where(MovieModel.id == movie_id)
+    result_check = await db_session.execute(stmt_check)
+    deleted_movie = result_check.scalars().first()
+    assert deleted_movie is None, f"Movie with ID {movie_id} was not deleted."
+
+
+@pytest.mark.asyncio
+async def test_delete_movie_not_found(client, create_activated_user_with_token):
+    """
+    Test the `/movies/{movie_id}/` endpoint with a non-existent movie ID.
+    """
+    non_existent_id = 99999
+
+    user, access_token = await create_activated_user_with_token()
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    response = await client.delete(f"/movies/{non_existent_id}/", headers=headers)
+    assert response.status_code == 404, f"Expected status code 404, got {response.status_code}"
+
+    response_data = response.json()
+    expected_detail = "Movie with the given ID was not found."
+    assert response_data["detail"] == expected_detail
+
+
+@pytest.mark.asyncio
+async def test_update_movie_success(client, db_session, create_movies, create_activated_user_with_token):
+    """
+    Test the `/movies/{movie_id}/` endpoint for successfully updating a movie's details.
+    """
+    movies = await create_movies(1)
+    movie_id = movies[0].id
+
+    user, access_token = await create_activated_user_with_token()
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    update_data = {
+        "name": "Updated Movie Name",
+        "meta_score": 95.0,
+    }
+
+    response = await client.patch(f"/movies/{movie_id}/", json=update_data, headers=headers)
+    assert response.status_code == 200, f"Expected status code 200, got {response.status_code}"
+
+    response_data = response.json()
+    assert response_data["name"] == update_data["name"]
+    assert response_data["meta_score"] == update_data["meta_score"]
+
+    movie = await db_session.get(MovieModel, movie_id)
+    await db_session.refresh(movie)
+
+    assert movie.name == update_data["name"]
+    assert movie.meta_score == update_data["meta_score"]
+
+
+@pytest.mark.asyncio
+async def test_update_movie_not_found(client, create_activated_user_with_token):
+    """
+    Test the `/movies/{movie_id}/` endpoint with a non-existent movie ID.
+    """
+    non_existent_id = 99999
+
+    user, access_token = await create_activated_user_with_token()
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    update_data = {
+        "name": "Non-existent Movie",
+        "meta_score": 90.0,
+    }
+
+    response = await client.patch(f"/movies/{non_existent_id}/", json=update_data, headers=headers)
+    assert response.status_code == 404, f"Expected status code 404, got {response.status_code}"
+
+    response_data = response.json()
+    expected_detail = "Movie not found"
+    assert response_data["detail"] == expected_detail
+
+
+@pytest.mark.asyncio
+async def test_set_movie_reaction_unauthorized(client, create_movies):
+    movies = await create_movies(1)
+    movie_id = movies[0].id
+
+    response = await client.post(f"/movies/{movie_id}/reaction/", json={"reaction": "like"})
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_set_movie_reaction_movie_not_found(client, create_activated_user_with_token):
+    user, token = await create_activated_user_with_token()
+    headers = {"Authorization": f"Bearer {token}"}
+
+    invalid_movie_id = 999999
+    response = await client.post(f"/movies/{invalid_movie_id}/reaction/", json={"reaction": "like"}, headers=headers)
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Movie not found"
+
+
+@pytest.mark.asyncio
+async def test_set_movie_reaction_success(client, db_session, create_movies, create_activated_user_with_token):
+    movies = await create_movies(1)
+    movie_id = movies[0].id
+
+    user, token = await create_activated_user_with_token()
+    headers = {"Authorization": f"Bearer {token}"}
+
+    payload = {"reaction": "like"}
+
+    response = await client.post(f"/movies/{movie_id}/reaction/", json=payload, headers=headers)
+    assert response.status_code == 200
+    assert response.json()["detail"] == "Reaction updated"
+
+    result = await db_session.execute(
+        select(MovieReactionModel).where(
+            MovieReactionModel.user_id == user.id,
+            MovieReactionModel.movie_id == movie_id
+        )
+    )
+    reaction = result.scalar_one()
+    assert reaction.reaction == "like"
+
+
+@pytest.mark.asyncio
+async def test_multiple_user_reactions_and_counts(client, db_session, create_movies, create_activated_user_with_token):
+    movies = await create_movies(1)
+    movie_id = movies[0].id
+
+    users = [await create_activated_user_with_token() for _ in range(3)]
+    headers_list = [{"Authorization": f"Bearer {token}"} for _, token in users]
+
+    await client.post(f"/movies/{movie_id}/reaction/", json={"reaction": "like"}, headers=headers_list[0])
+    await client.post(f"/movies/{movie_id}/reaction/", json={"reaction": "dislike"}, headers=headers_list[1])
+    await client.post(f"/movies/{movie_id}/reaction/", json={"reaction": "like"}, headers=headers_list[2])
+
+    response = await client.get(f"/movies/{movie_id}/")
+    data = response.json()
+    assert data["likes_count"] == 2
+    assert data["dislikes_count"] == 1
+
+    await client.post(f"/movies/{movie_id}/reaction/", json={"reaction": "dislike"}, headers=headers_list[0])
+
+    response = await client.get(f"/movies/{movie_id}/")
+    data = response.json()
+    assert data["likes_count"] == 1
+    assert data["dislikes_count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_remove_reaction_success(client, db_session, create_movies, create_activated_user_with_token):
+    movies = await create_movies(1)
+    movie_id = movies[0].id
+
+    user, token = await create_activated_user_with_token()
+    headers = {"Authorization": f"Bearer {token}"}
+
+    await client.post(f"/movies/{movie_id}/reaction/", json={"reaction": "like"}, headers=headers)
+
+    response = await client.post(f"/movies/{movie_id}/reaction/", json={"reaction": None}, headers=headers)
+    assert response.status_code == 200
+    assert response.json()["detail"] == "Reaction removed"
+
+    result = await db_session.execute(
+        select(MovieReactionModel).where(
+            MovieReactionModel.user_id == user.id,
+            MovieReactionModel.movie_id == movie_id
+        )
+    )
+    assert result.scalar_one_or_none() is None
+
+
+@pytest.mark.asyncio
+async def test_rate_movie_unauthorized(client, create_movies):
+    movies = await create_movies(1)
+    movie_id = movies[0].id
+
+    response = await client.post(f"/movies/{movie_id}/rate/", json={"rating": 4})
+    assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_rate_movie_not_found(client, create_activated_user_with_token):
+        user, token = await create_activated_user_with_token()
+        headers = {"Authorization": f"Bearer {token}"}
+
+        response = await client.post(f"/movies/999999/rate/", json={"rating": 4}, headers=headers)
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Movie not found"
+
+
+@pytest.mark.asyncio
+async def test_rate_movie_success(client, db_session, create_movies, create_activated_user_with_token):
+    movies = await create_movies(1)
+    movie_id = movies[0].id
+
+    user, token = await create_activated_user_with_token()
+    headers = {"Authorization": f"Bearer {token}"}
+
+    response = await client.post(f"/movies/{movie_id}/rate/", json={"rating": 4}, headers=headers)
+    assert response.status_code == 200
+    assert response.json()["detail"] == "Rating updated"
+
+    result = await db_session.execute(
+        select(MovieRatingModel).where(
+            MovieRatingModel.user_id == user.id,
+            MovieRatingModel.movie_id == movie_id
+        )
+    )
+    rating = result.scalar_one()
+    assert rating.rating == 4
+
+
+@pytest.mark.asyncio
+async def test_multiple_users_rating_and_average(client, create_movies, create_activated_user_with_token):
+    movies = await create_movies(1)
+    movie_id = movies[0].id
+
+    users = [await create_activated_user_with_token() for _ in range(3)]
+    headers_list = [{"Authorization": f"Bearer {token}"} for _, token in users]
+    ratings = [3, 4, 5]
+
+    for i in range(3):
+        response = await client.post(f"/movies/{movie_id}/rate/", json={"rating": ratings[i]}, headers=headers_list[i])
+        assert response.status_code == 200
+
+    response = await client.get(f"/movies/{movie_id}/")
+    data = response.json()
+
+    assert data["average_rating"] == 4.0
+
+
+@pytest.mark.asyncio
+async def test_create_comment_unauthorized(client, create_movies):
+    movie = (await create_movies(1))[0]
+    response = await client.post(
+        f"/movies/{movie.id}/comments/",
+        json={"content": "Test comment"}
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_create_comment_movie_not_found(client, create_activated_user_with_token):
+    _, token = await create_activated_user_with_token()
+    headers = {"Authorization": f"Bearer {token}"}
+
+    response = await client.post(
+        "/movies/999999/comments/",
+        json={"content": "Test comment"},
+        headers=headers
+    )
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Movies not found"
+
+
+@pytest.mark.asyncio
+async def test_create_comment_success(client, create_movies, create_activated_user_with_token):
+    movie = (await create_movies(1))[0]
+    user, token = await create_activated_user_with_token()
+    headers = {"Authorization": f"Bearer {token}"}
+
+    response = await client.post(
+        f"/movies/{movie.id}/comments/",
+        json={"content": "Awesome movie!"},
+        headers=headers
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["content"] == "Awesome movie!"
+    assert data["movie_id"] == movie.id
+    assert data["user_id"] == user.id
+    assert data["user_email"] == user.email
+
+
+@pytest.mark.asyncio
+async def test_get_comments_with_replies_with_reactions(
+    client,
+    create_activated_user_with_token,
+    create_movies,
+):
+    movies = await create_movies(1)
+    movie = movies[0]
+
+    user, token = await create_activated_user_with_token()
+    headers = {"Authorization": f"Bearer {token}"}
+
+    root_response = await client.post(
+        f"/movies/{movie.id}/comments/",
+        json={"content": "Root comment"},
+        headers=headers
+    )
+    assert root_response.status_code == 201
+    root_comment = root_response.json()
+    root_id = root_comment["id"]
+
+    reply_response = await client.post(
+        f"/comments/{root_id}/reply/",
+        json={"content": "This is a reply"},
+        headers=headers
+    )
+    assert reply_response.status_code == 201
+    reply = reply_response.json()
+    reply_id = reply["id"]
+
+    root_like_response = await client.post(
+        f"/comments/{root_id}/reaction/",
+        json={"reaction": "like"},
+        headers=headers
+    )
+    assert root_like_response.status_code == 200
+
+    reply_dislike_response = await client.post(
+        f"/comments/{reply_id}/reaction/",
+        json={"reaction": "dislike"},
+        headers=headers
+    )
+    assert reply_dislike_response.status_code == 200
+
+    get_response = await client.get(f"/movies/{movie.id}/comments/")
+    assert get_response.status_code == 200
+
+    comments = get_response.json()
+    assert isinstance(comments, list)
+    assert len(comments) == 1
+
+    root = comments[0]
+    assert root["id"] == root_id
+    assert root["content"] == "Root comment"
+    assert root["user_email"] == user.email
+    assert root["likes_count"] == 1
+    assert root["dislikes_count"] == 0
+
+    replies = root["replies"]
+    assert len(replies) == 1
+    reply = replies[0]
+    assert reply["id"] == reply_id
+    assert reply["content"] == "This is a reply"
+    assert reply["parent_id"] == root_id
+    assert reply["user_email"] == user.email
+    assert reply["likes_count"] == 0
+    assert reply["dislikes_count"] == 1
