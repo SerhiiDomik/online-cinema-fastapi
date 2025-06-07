@@ -66,3 +66,26 @@ async def test_get_genres_movie_count_and_movies_ids(client, create_movies):
     response_ids = sorted(genre["movie_ids"])
 
     assert response_ids == expected_ids
+
+
+@pytest.mark.asyncio
+async def test_deleting_movie_does_not_delete_genres(db_session, create_movies):
+    genre_name = "Thriller"
+
+    movies = await create_movies(1, genres=[genre_name])
+    movie = movies[0]
+
+    result = await db_session.execute(
+        select(GenreModel).where(GenreModel.name == genre_name)
+    )
+    genre = result.scalars().first()
+    assert genre is not None, "Genre should exist before movie deletion"
+
+    await db_session.delete(movie)
+    await db_session.commit()
+
+    result = await db_session.execute(
+        select(GenreModel).where(GenreModel.name == genre_name)
+    )
+    genre_after_delete = result.scalars().first()
+    assert genre_after_delete is not None, "Genre should not be deleted after movie deletion"

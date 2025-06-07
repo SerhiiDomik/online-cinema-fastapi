@@ -8,6 +8,7 @@ from sqlalchemy import select, func, or_, and_, distinct
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
+from typing import Optional
 
 from database import get_db, User
 from database.models import (
@@ -57,7 +58,7 @@ async def get_movie_list(
         year: int = None,
         min_rating: float = Query(None, ge=0, le=10),
         max_rating: float = Query(None, ge=0, le=10),
-        genre: Union[List[str], None] = Query(None),
+        genre: Optional[str] = Query(None),
         certification: str = None,
         sort_by: str = Query(None, description="Sort by: price, year, imdb, votes"),
         search: str = None,

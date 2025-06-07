@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security import HTTPBearer
-from sqlalchemy import select, func, or_, and_, delete
+from sqlalchemy import select, func, or_, and_, delete, distinct
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -9,6 +9,7 @@ from database.models import MovieModel, GenreModel, CertificationModel, Director
 from database.models.movies import FavoriteMoviesModel
 from routes.dependencies import get_current_user
 from schemas.movies import FavoriteListResponseSchema, FavoriteMovieSchema
+from typing import Optional
 
 router = APIRouter()
 
@@ -16,7 +17,7 @@ security = HTTPBearer()
 
 
 @router.post(
-    "/{movie_id}",
+    "/{movie_id}/",
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(security)],
     summary="Add movie to favorites"
@@ -49,7 +50,7 @@ async def add_to_favorites(
 
 
 @router.delete(
-    "/{movie_id}",
+    "/{movie_id}/",
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(security)],
     summary="Remove movie from favorites"
@@ -86,24 +87,22 @@ async def get_favorites(
         year: int = None,
         min_rating: float = Query(None, ge=0, le=10),
         max_rating: float = Query(None, ge=0, le=10),
-        genre: str = None,
+        genre: Optional[str] = Query(None),
         certification: str = None,
-        sort_by: str = Query(None),
+        sort_by: str = Query(None, description="Sort by: price, year, imdb, votes, favorited"),
         search: str = None,
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user),
 ):
     stmt = (
-        select(
-            MovieModel,
-            FavoriteMoviesModel.created_at.label("favorited_at")
-        )
+        select(MovieModel, FavoriteMoviesModel.created_at.label("favorited_at"))
         .join(FavoriteMoviesModel)
         .where(FavoriteMoviesModel.user_id == current_user.id)
+        .distinct()
     )
 
     if year:
-        stmt = stmt.where(MovieModel.year == year)
+        stmt = stmt.where(MovieModel.year == int(year))
 
     if min_rating is not None:
         stmt = stmt.where(MovieModel.imdb >= min_rating)
@@ -112,7 +111,15 @@ async def get_favorites(
         stmt = stmt.where(MovieModel.imdb <= max_rating)
 
     if genre:
-        stmt = stmt.join(MovieModel.genres).where(GenreModel.name == genre)
+        genre_names = [name.strip() for name in genre.split(",")]
+        genre_names = list(set(genre_names))
+
+        stmt = (
+            stmt.join(MovieModel.genres)
+            .where(GenreModel.name.in_(genre_names))
+            .group_by(MovieModel.id)
+            .having(func.count(distinct(GenreModel.name)) == len(genre_names))
+        )
 
     if certification:
         stmt = stmt.join(MovieModel.certification).where(CertificationModel.name == certification)
@@ -137,31 +144,30 @@ async def get_favorites(
         }
         sort_field = sort_mapping.get(sort_by.lstrip("-"))
         if sort_field is None:
-            raise HTTPException(status_code=400, detail="Invalid sort_by parameter")
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid sort_by parameter"
+            )
 
-        if sort_by.startswith("-"):
-            stmt = stmt.order_by(sort_field.desc())
-        else:
-            stmt = stmt.order_by(sort_field.asc())
+        stmt = stmt.order_by(sort_field.desc() if sort_by.startswith("-") else sort_field.asc())
     else:
         stmt = stmt.order_by(FavoriteMoviesModel.created_at.desc())
 
-    count_stmt = select(func.count()).select_from(stmt)
+    count_stmt = select(func.count()).select_from(stmt.order_by(None).subquery())
     total_items = (await db.execute(count_stmt)).scalar() or 0
+    total_pages = (total_items + per_page - 1) // per_page
 
-    stmt = stmt.offset((page - 1) * per_page).limit(per_page)
+    if page > total_pages > 0:
+        raise HTTPException(status_code=404, detail="Page not found")
 
-    result = await db.execute(
-        stmt.options(
-            joinedload(MovieModel.certification),
-            selectinload(MovieModel.genres),
-            selectinload(MovieModel.directors),
-            selectinload(MovieModel.stars)
-        )
-        .offset((page - 1) * per_page)
-        .limit(per_page)
-    )
+    stmt = stmt.options(
+        joinedload(MovieModel.certification),
+        selectinload(MovieModel.genres),
+        selectinload(MovieModel.directors),
+        selectinload(MovieModel.stars)
+    ).offset((page - 1) * per_page).limit(per_page)
 
+    result = await db.execute(stmt)
     movies_with_dates = result.unique().tuples().all()
 
     return FavoriteListResponseSchema(
@@ -173,6 +179,6 @@ async def get_favorites(
             for movie in movies_with_dates
         ],
         total_items=total_items,
-        total_pages=(total_items + per_page - 1) // per_page,
+        total_pages=total_pages,
         current_page=page
     )
