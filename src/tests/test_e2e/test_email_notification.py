@@ -150,9 +150,6 @@ async def test_account_activation(e2e_client, settings, e2e_db_session):
 @pytest.mark.order(3)
 @pytest.mark.asyncio
 async def test_resend_activation_token_and_activate(e2e_client, e2e_db_session, settings):
-    """
-    Test resending the activation token when the original one has expired.
-    """
 
     user_email = "test1@email.com"
 

@@ -161,7 +161,6 @@ async def test_favorite_movies_filters(client, create_movies, create_activated_u
     data = resp.json()
     assert resp.status_code == 200
     assert len(data["movies"]) == 2
-    # Fixed: use data instead of resp
     assert all(m["imdb"] >= 7.0 for m in data["movies"])
 
 

@@ -18,9 +18,6 @@ from database.models.movies import (
 
 @pytest.mark.asyncio
 async def test_get_movies_empty_database(client):
-    """
-    Test that the `/movies/` endpoint returns a 404 error when the database is empty.
-    """
     response = await client.get("/movies/")
     assert response.status_code == 404, f"Expected 404, got {response.status_code}"
 
@@ -30,9 +27,6 @@ async def test_get_movies_empty_database(client):
 
 @pytest.mark.asyncio
 async def test_get_movies_default_parameters(client, create_movies):
-    """
-    Test the `/movies/` endpoint with default pagination parameters.
-    """
     await create_movies(10)
     response = await client.get("/movies/")
     assert response.status_code == 200, "Expected status code 200, but got a different value"
@@ -54,9 +48,6 @@ async def test_get_movies_default_parameters(client, create_movies):
 
 @pytest.mark.asyncio
 async def test_get_movies_with_custom_parameters(client, create_movies):
-    """
-    Test the `/movies/` endpoint with custom pagination parameters.
-    """
     await create_movies(10)
 
     page = 2
@@ -97,9 +88,6 @@ async def test_get_movies_with_custom_parameters(client, create_movies):
     (0, 0, "Input should be greater than or equal to 1"),
 ])
 async def test_invalid_page_and_per_page(client, page, per_page, expected_detail, create_movies):
-    """
-    Test the `/movies/` endpoint with invalid `page` and `per_page` parameters.
-    """
     await create_movies(10)
 
     response = await client.get(f"/movies/?page={page}&per_page={per_page}")
@@ -119,9 +107,6 @@ async def test_invalid_page_and_per_page(client, page, per_page, expected_detail
 
 @pytest.mark.asyncio
 async def test_per_page_maximum_allowed_value(client, create_movies):
-    """
-    Test the `/movies/` endpoint with the maximum allowed `per_page` value.
-    """
     await create_movies(10)
 
     response = await client.get("/movies/?page=1&per_page=20")
@@ -138,9 +123,6 @@ async def test_per_page_maximum_allowed_value(client, create_movies):
 
 @pytest.mark.asyncio
 async def test_page_exceeds_maximum(client, db_session, create_movies):
-    """
-    Test the `/movies/` endpoint with a page number that exceeds the maximum.
-    """
     await create_movies(10)
 
     per_page = 10
@@ -161,10 +143,6 @@ async def test_page_exceeds_maximum(client, db_session, create_movies):
 
 @pytest.mark.asyncio
 async def test_movies_sorted_by_id_desc(client, db_session, create_movies):
-    """
-    Test that movies are returned sorted by `id` in descending order
-    and match the expected data from the database.
-    """
     await create_movies(10)
 
     response = await client.get("/movies/?page=1&per_page=10")
@@ -188,15 +166,6 @@ async def test_movies_sorted_by_id_desc(client, db_session, create_movies):
 
 @pytest.mark.asyncio
 async def test_movie_list_with_pagination(client, db_session, create_movies):
-    """
-    Test the `/movies/` endpoint with pagination parameters.
-
-    Verifies the following:
-    - The response status code is 200.
-    - Total items and total pages match the expected values from the database.
-    - The movies returned match the expected movies for the given page and per_page.
-    - The `prev_page` and `next_page` links are correct.
-    """
     await create_movies(10)
 
     page = 2
@@ -240,9 +209,6 @@ async def test_movie_list_with_pagination(client, db_session, create_movies):
 
 @pytest.mark.asyncio
 async def test_movies_fields_match_schema(client, db_session, create_movies):
-    """
-    Test that each movie in the response matches the fields defined in `MovieListItemSchema`.
-    """
     await create_movies(10)
 
     response = await client.get("/movies/?page=1&per_page=10")
@@ -401,10 +367,6 @@ async def test_movie_pagination_with_filters(client, create_movies):
 
 @pytest.mark.asyncio
 async def test_get_movie_by_id_not_found(client):
-    """
-    Test that the `/movies/{movie_id}` endpoint returns a 404 error
-    when a movie with the given ID does not exist.
-    """
     movie_id = 99999
 
     response = await client.get(f"/movies/{movie_id}/")
@@ -418,15 +380,6 @@ async def test_get_movie_by_id_not_found(client):
 
 @pytest.mark.asyncio
 async def test_get_movie_by_id_valid(client, db_session, create_movies):
-    """
-    Test that the `/movies/{movie_id}` endpoint returns the correct movie details
-    when a valid movie ID is provided.
-
-    Verifies the following:
-    - The movie exists in the database.
-    - The response status code is 200.
-    - The movie's `id` and `name` in the response match the expected values from the database.
-    """
     await create_movies(1)
 
     stmt = select(MovieModel.id).order_by(MovieModel.id.asc())
@@ -451,9 +404,6 @@ async def test_get_movie_by_id_valid(client, db_session, create_movies):
 
 @pytest.mark.asyncio
 async def test_get_movie_by_id_fields_match_database(client, db_session, create_movies):
-    """
-    Test that the `/movies/{movie_id}` endpoint returns all fields matching the database data.
-    """
     await create_movies(5)
 
     stmt = (
@@ -491,17 +441,14 @@ async def test_get_movie_by_id_fields_match_database(client, db_session, create_
     assert data["certification"]["id"] == movie.certification.id
     assert data["certification"]["name"] == movie.certification.name
 
-    # Genres
     expected_genres = sorted([g.name for g in movie.genres])
     response_genres = sorted([g["name"] for g in data["genres"]])
     assert response_genres == expected_genres
 
-    # Directors
     expected_directors = sorted([d.name for d in movie.directors])
     response_directors = sorted([d["name"] for d in data["directors"]])
     assert response_directors == expected_directors
 
-    # Stars
     expected_stars = sorted([s.name for s in movie.stars])
     response_stars = sorted([s["name"] for s in data["stars"]])
     assert response_stars == expected_stars
@@ -541,10 +488,6 @@ async def test_create_movie_unauthorized(client):
 
 @pytest.mark.asyncio
 async def test_create_movie_and_related_models(client, db_session, create_activated_user_with_token):
-    """
-    Test that a new movie is created successfully and related models
-    (genres, actors, languages) are created if they do not exist.
-    """
 
     user, token = await create_activated_user_with_token()
     headers = {"Authorization": f"Bearer {token}"}
@@ -593,10 +536,6 @@ async def test_create_movie_and_related_models(client, db_session, create_activa
 
 @pytest.mark.asyncio
 async def test_create_movie_duplicate_error(client, db_session, create_activated_user_with_token):
-    """
-    Test that trying to create a movie with the same name and date as an existing movie
-    results in a 409 conflict error.
-    """
 
     user, token = await create_activated_user_with_token()
     headers = {"Authorization": f"Bearer {token}"}
@@ -630,9 +569,6 @@ async def test_create_movie_duplicate_error(client, db_session, create_activated
 
 @pytest.mark.asyncio
 async def test_delete_movie_success(client, db_session, create_movies, create_activated_user_with_token):
-    """
-    Test the `/movies/{movie_id}/` endpoint for successful movie deletion.
-    """
     movies = await create_movies(1)
     movie_id  = movies[0].id
 
@@ -652,9 +588,6 @@ async def test_delete_movie_success(client, db_session, create_movies, create_ac
 
 @pytest.mark.asyncio
 async def test_delete_movie_not_found(client, create_activated_user_with_token):
-    """
-    Test the `/movies/{movie_id}/` endpoint with a non-existent movie ID.
-    """
     non_existent_id = 99999
 
     user, access_token = await create_activated_user_with_token()
@@ -670,9 +603,6 @@ async def test_delete_movie_not_found(client, create_activated_user_with_token):
 
 @pytest.mark.asyncio
 async def test_update_movie_success(client, db_session, create_movies, create_activated_user_with_token):
-    """
-    Test the `/movies/{movie_id}/` endpoint for successfully updating a movie's details.
-    """
     movies = await create_movies(1)
     movie_id = movies[0].id
 
@@ -700,9 +630,6 @@ async def test_update_movie_success(client, db_session, create_movies, create_ac
 
 @pytest.mark.asyncio
 async def test_update_movie_not_found(client, create_activated_user_with_token):
-    """
-    Test the `/movies/{movie_id}/` endpoint with a non-existent movie ID.
-    """
     non_existent_id = 99999
 
     user, access_token = await create_activated_user_with_token()

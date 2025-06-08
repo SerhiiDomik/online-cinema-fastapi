@@ -18,11 +18,6 @@ from database import (
 
 @pytest.mark.asyncio
 async def test_register_user_success(client, db_session, seed_user_groups):
-    """
-    Test successful user registration.
-
-    Validates that a new user and an activation token are created in the database.
-    """
     payload = {
         "email": "testuser@example.com",
         "password": "StrongPassword123!"
@@ -63,18 +58,6 @@ async def test_register_user_success(client, db_session, seed_user_groups):
     ("NoSpecial123", "Password must contain at least one special character: @, $, !, %, *, ?, #, &."),
 ])
 async def test_register_user_password_validation(client, seed_user_groups, invalid_password, expected_error):
-    """
-    Test password strength validation in the user registration endpoint.
-
-    Ensures that when an invalid password is provided, the endpoint returns the appropriate
-    error message and a 422 status code.
-
-    Args:
-        client: The asynchronous HTTP client fixture.
-        seed_user_groups: Fixture that seeds the default user groups.
-        invalid_password (str): The password to test.
-        expected_error (str): The expected error message substring.
-    """
     payload = {
         "email": "testuser@example.com",
         "password": invalid_password
@@ -89,17 +72,6 @@ async def test_register_user_password_validation(client, seed_user_groups, inval
 
 @pytest.mark.asyncio
 async def test_register_user_conflict(client, db_session, seed_user_groups):
-    """
-    Test user registration conflict.
-
-    Ensures that trying to register a user with an existing email
-    returns a 409 Conflict status and the correct error message.
-
-    Args:
-        client: The asynchronous HTTP client fixture.
-        db_session: The asynchronous database session fixture.
-        seed_user_groups: Fixture that seeds default user groups.
-    """
     payload = {
         "email": "conflictuser@example.com",
         "password": "StrongPassword123!"
@@ -123,15 +95,6 @@ async def test_register_user_conflict(client, db_session, seed_user_groups):
 
 @pytest.mark.asyncio
 async def test_register_user_internal_server_error(client, seed_user_groups):
-    """
-    Test server error during user registration.
-
-    Ensures that a 500 Internal Server Error is returned when a database operation fails.
-
-    This test patches the commit method of the AsyncSession to simulate a SQLAlchemyError,
-    then verifies that the registration endpoint returns the appropriate HTTP 500 error
-    with the expected error message.
-    """
     payload = {
         "email": "erroruser@example.com",
         "password": "StrongPassword123!"
@@ -149,15 +112,6 @@ async def test_register_user_internal_server_error(client, seed_user_groups):
 
 @pytest.mark.asyncio
 async def test_activate_account_success(client, db_session, seed_user_groups):
-    """
-    Test successful activation of a user account.
-
-    Steps:
-    - Register a new user.
-    - Verify the user is inactive.
-    - Activate the user using the activation token.
-    - Verify the user is activated and the token is deleted.
-    """
     registration_payload = {
         "email": "testuser@example.com",
         "password": "StrongPassword123!"
@@ -206,17 +160,6 @@ async def test_activate_account_success(client, db_session, seed_user_groups):
 
 @pytest.mark.asyncio
 async def test_activate_user_with_expired_token(client, db_session, seed_user_groups):
-    """
-    Test activation with an expired token.
-
-    Ensures that the endpoint returns a 400 error when the activation token is expired.
-    Steps:
-    - Register a new user.
-    - Retrieve the user and their activation token.
-    - Manually set the token's expiration to a past date.
-    - Attempt to activate the account with the expired token.
-    - Verify that the response is a 400 error with the expected error message.
-    """
     registration_payload = {
         "email": "testuser@example.com",
         "password": "StrongPassword123!"
@@ -252,18 +195,6 @@ async def test_activate_user_with_expired_token(client, db_session, seed_user_gr
 
 @pytest.mark.asyncio
 async def test_activate_user_with_deleted_token(client, db_session, seed_user_groups):
-    """
-    Test activation with a deleted token.
-
-    Ensures that the endpoint returns a 400 error when the activation token has been deleted.
-
-    Steps:
-    - Register a new user.
-    - Verify that the user is created and inactive.
-    - Delete the activation token from the database.
-    - Attempt to activate the account using the deleted token.
-    - Verify that a 400 error is returned with the appropriate error message.
-    """
     registration_payload = {
         "email": "testuser@example.com",
         "password": "StrongPassword123!"
@@ -302,16 +233,6 @@ async def test_activate_user_with_deleted_token(client, db_session, seed_user_gr
 
 @pytest.mark.asyncio
 async def test_activate_already_active_user(client, db_session, seed_user_groups):
-    """
-    Test activation of an already active user.
-
-    Ensures that the endpoint returns a 400 error if the user is already active.
-    Steps:
-    - Register a new user.
-    - Mark the user as active in the database.
-    - Attempt to activate the user using the activation token.
-    - Verify that a 400 error with the expected error message is returned.
-    """
     registration_payload = {
         "email": "testuser@example.com",
         "password": "StrongPassword123!"
@@ -346,14 +267,6 @@ async def test_activate_already_active_user(client, db_session, seed_user_groups
 
 @pytest.mark.asyncio
 async def test_resend_activation_inactive_user(client, db_session, seed_user_groups):
-    """
-    For an existing but inactive user:
-    - First: create a user (via User.create), ActivationTokenModel is created immediately during registration.
-    - Manual "expiration" of the initial token (set expires_at to the past).
-    - Call POST /users/resend-activation/?email=<email>
-    - Expect status_code == 200, message == "New activation token has been sent to your email"
-    - Check that a new ActivationTokenModel has appeared in the database (there must be at least 1 of them, while the old one can be considered inactive).
-    """
     user_email = "inactive@example.com"
     register_payload = {
         "email": user_email,
@@ -389,12 +302,6 @@ async def test_resend_activation_inactive_user(client, db_session, seed_user_gro
 
 @pytest.mark.asyncio
 async def test_resend_activation_already_active_user(client, db_session, seed_user_groups):
-    """
-    For an active user:
-    - Create a user and manually set is_active=True.
-    - Call POST /users/resend-activation/?email=<email>
-    - Expect status_code == 400 and detail == "User account is already active"
-    """
     user_email = "active@example.com"
     register_payload = {
         "email": user_email,
@@ -418,12 +325,6 @@ async def test_resend_activation_already_active_user(client, db_session, seed_us
 
 @pytest.mark.asyncio
 async def test_resend_activation_nonexistent_email(client, db_session, seed_user_groups):
-    """
-    For non-existent email:
-    - Call POST /users/resend-activation/?email=<random>
-    - Expect status_code == 200 (generic message)
-    - Check that there are NO new records in the ActivationTokenModel table
-    """
     stmt_all_tokens_before = select(ActivationTokenModel)
     result_all_before = await db_session.execute(stmt_all_tokens_before)
     tokens_before = result_all_before.scalars().all()
@@ -443,19 +344,6 @@ async def test_resend_activation_nonexistent_email(client, db_session, seed_user
 
 @pytest.mark.asyncio
 async def test_request_password_reset_token_success(client, db_session, seed_user_groups):
-    """
-    Test successful password reset token request.
-
-    Ensures that a password reset token is created for an active user.
-
-    Steps:
-    - Register a new user.
-    - Mark the user as active.
-    - Request a password reset token.
-    - Verify that the endpoint returns status 200 and the expected success message.
-    - Query the database to confirm that a PasswordResetTokenModel record was created.
-    - Verify that the token's expiration date is in the future.
-    """
     registration_payload = {
         "email": "testuser@example.com",
         "password": "StrongPassword123!"
@@ -491,12 +379,6 @@ async def test_request_password_reset_token_success(client, db_session, seed_use
 
 @pytest.mark.asyncio
 async def test_request_password_reset_token_nonexistent_user(client, db_session):
-    """
-    Test password reset token request for a non-existent user.
-
-    Ensures that the endpoint responds with a generic success message and that no password reset token is created
-    when the email does not exist in the database.
-    """
     reset_payload = {"email": "nonexistent@example.com"}
 
     reset_response = await client.post("/users/password-reset/request/", json=reset_payload)
@@ -513,12 +395,6 @@ async def test_request_password_reset_token_nonexistent_user(client, db_session)
 
 @pytest.mark.asyncio
 async def test_request_password_reset_token_for_inactive_user(client, db_session, seed_user_groups):
-    """
-    Test password reset token request for a registered but inactive user.
-
-    Ensures that the endpoint returns the generic success message and that no password reset token
-    is created when the user is registered but inactive.
-    """
     registration_payload = {
         "email": "inactiveuser@example.com",
         "password": "StrongPassword123!"
@@ -547,16 +423,6 @@ async def test_request_password_reset_token_for_inactive_user(client, db_session
 
 @pytest.mark.asyncio
 async def test_reset_password_success(client, db_session, seed_user_groups):
-    """
-    Test the complete password reset flow.
-
-    Steps:
-    - Register a user.
-    - Activate the user.
-    - Request a password reset token.
-    - Use the token to reset the password.
-    - Verify the password is updated in the database.
-    """
     registration_payload = {
         "email": "testuser@example.com",
         "password": "OldPassword123!"
@@ -611,11 +477,6 @@ async def test_reset_password_success(client, db_session, seed_user_groups):
 
 @pytest.mark.asyncio
 async def test_reset_password_invalid_email(client, db_session):
-    """
-    Test password reset with an email that does not exist in the database.
-
-    Validates that the endpoint returns a 400 status code and appropriate error message.
-    """
     reset_payload = {
         "email": "nonexistent@example.com",
         "token": "random_token",
@@ -630,12 +491,6 @@ async def test_reset_password_invalid_email(client, db_session):
 
 @pytest.mark.asyncio
 async def test_reset_password_invalid_token(client, db_session, seed_user_groups):
-    """
-    Test password reset with an incorrect token.
-
-    Validates that the endpoint returns a 400 status code and an appropriate error message when an invalid token is provided.
-    Also ensures that any invalid token is removed from the database.
-    """
     registration_payload = {
         "email": "testuser@example.com",
         "password": "StrongPassword123!"
@@ -672,12 +527,6 @@ async def test_reset_password_invalid_token(client, db_session, seed_user_groups
 
 @pytest.mark.asyncio
 async def test_reset_password_expired_token(client, db_session, seed_user_groups):
-    """
-    Test password reset with an expired token.
-
-    Validates that the endpoint returns a 400 status code and an appropriate error message when the password
-    reset token is expired, and verifies that the expired token is removed from the database.
-    """
     registration_payload = {
         "email": "testuser@example.com",
         "password": "StrongPassword123!"
@@ -722,19 +571,6 @@ async def test_reset_password_expired_token(client, db_session, seed_user_groups
 
 @pytest.mark.asyncio
 async def test_reset_password_sqlalchemy_error(client, db_session, seed_user_groups):
-    """
-    Test password reset when a database commit raises SQLAlchemyError.
-
-    Validates that the endpoint returns a 500 Internal Server Error and the appropriate error message
-    when an error occurs during the password reset process.
-
-    Steps:
-    - Register a new user.
-    - Mark the user as active.
-    - Request a password reset token.
-    - Attempt to reset the password while simulating a database commit error.
-    - Verify that a 500 error is returned with the expected error message.
-    """
     registration_payload = {
         "email": "testuser@example.com",
         "password": "StrongPassword123!"
@@ -776,12 +612,6 @@ async def test_reset_password_sqlalchemy_error(client, db_session, seed_user_gro
 
 @pytest.mark.asyncio
 async def test_login_user_success(client, db_session, jwt_manager, seed_user_groups):
-    """
-    Test successful login.
-
-    Validates that access and refresh tokens are returned, the refresh token is stored in the database,
-    and both tokens are valid.
-    """
     user_payload = {
         "email": "testuser@example.com",
         "password": "StrongPassword123!"
@@ -834,11 +664,6 @@ async def test_login_user_success(client, db_session, jwt_manager, seed_user_gro
 
 @pytest.mark.asyncio
 async def test_login_user_invalid_cases(client, db_session, seed_user_groups):
-    """
-    Test login with invalid cases:
-    1. Non-existent user.
-    2. Incorrect password for an existing user.
-    """
     login_payload = {
         "email": "nonexistent@example.com",
         "password": "SomePassword123!"
@@ -878,12 +703,6 @@ async def test_login_user_invalid_cases(client, db_session, seed_user_groups):
 
 @pytest.mark.asyncio
 async def test_login_user_inactive_account(client, db_session, seed_user_groups):
-    """
-    Test login with an inactive user account.
-
-    Validates that the endpoint returns a 403 status code and an appropriate error message
-    when attempting to log in with a user whose account is not activated.
-    """
     user_payload = {
         "email": "inactiveuser@example.com",
         "password": "StrongPassword123!"
@@ -916,11 +735,6 @@ async def test_login_user_inactive_account(client, db_session, seed_user_groups)
 
 @pytest.mark.asyncio
 async def test_login_user_commit_error(client, db_session, seed_user_groups):
-    """
-    Test login when a database commit error occurs.
-
-    Validates that the endpoint returns a 500 status code and an appropriate error message.
-    """
     user_payload = {
         "email": "testuser@example.com",
         "password": "StrongPassword123!"
@@ -954,16 +768,6 @@ async def test_login_user_commit_error(client, db_session, seed_user_groups):
 
 
 async def test_logout_user_success(client, db_session, jwt_manager, seed_user_groups):
-    """
-    Test successful logout.
-
-    Steps:
-    - Create an active user in the database.
-    - Log in, get refresh_token.
-    - Make a request to /users/logout/ with refresh_token.
-    - Verify that the status is 200, the message 'Successfully logged out.'
-    - Verify that the entry in the RefreshTokenModel table is deleted.
-    """
     stmt_group = select(UserGroup).where(UserGroup.name == UserGroupEnum.USER)
     result_group = await db_session.execute(stmt_group)
     user_group = result_group.scalars().first()
@@ -1009,13 +813,6 @@ async def test_logout_user_success(client, db_session, jwt_manager, seed_user_gr
 
 @pytest.mark.asyncio
 async def test_logout_user_invalid_token(client, db_session, seed_user_groups):
-    """
-    Test logout with invalid refresh token.
-
-    Steps:
-    - Send a logout request with an arbitrary (non-existent) refresh_token.
-    - Expect a status of 400 and detail "Invalid refresh token."
-    """
     invalid_token = "some.random.invalid.token"
 
     logout_payload = {"refresh_token": invalid_token}
@@ -1027,16 +824,6 @@ async def test_logout_user_invalid_token(client, db_session, seed_user_groups):
 
 @pytest.mark.asyncio
 async def test_refresh_access_token_success(client, db_session, jwt_manager, seed_user_groups):
-    """
-    Test successful access token refresh.
-
-    Validates that a new access token is returned when a valid refresh token is provided.
-    Steps:
-    - Create an active user in the database.
-    - Log in the user to obtain a refresh token.
-    - Use the refresh token to obtain a new access token.
-    - Verify that the new access token contains the correct user ID.
-    """
     user_payload = {
         "email": "testuser@example.com",
         "password": "StrongPassword123!"
@@ -1077,12 +864,6 @@ async def test_refresh_access_token_success(client, db_session, jwt_manager, see
 
 @pytest.mark.asyncio
 async def test_refresh_access_token_expired_token(client, jwt_manager):
-    """
-    Test refresh token with expired token.
-
-    Validates that a 400 status code and "Token has expired." message are returned
-    when the refresh token is expired.
-    """
     expired_token = jwt_manager.create_refresh_token(
         {"sub": 1},
         expires_delta=timedelta(days=-1)
@@ -1097,12 +878,6 @@ async def test_refresh_access_token_expired_token(client, jwt_manager):
 
 @pytest.mark.asyncio
 async def test_refresh_access_token_token_not_found(client, jwt_manager):
-    """
-    Test refresh token when token is not found in the database.
-
-    Validates that a 401 status code and 'Refresh token not found.' message
-    are returned when the refresh token is not stored in the database.
-    """
     refresh_token = jwt_manager.create_refresh_token({"sub": "1"})
     refresh_payload = {"refresh_token": refresh_token}
     refresh_response = await client.post("/users/refresh/", json=refresh_payload)
@@ -1113,19 +888,6 @@ async def test_refresh_access_token_token_not_found(client, jwt_manager):
 
 @pytest.mark.asyncio
 async def test_refresh_access_token_user_not_found(client, db_session, jwt_manager, seed_user_groups):
-    """
-    Test refresh token when user ID inside the token does not exist in the database.
-
-    Validates that a 404 status code and "User not found." message
-    are returned when the user ID in the token is invalid.
-
-    Steps:
-    - Create a new active user.
-    - Generate a refresh token with an invalid user ID.
-    - Store the refresh token in the database.
-    - Attempt to refresh the access token using the invalid refresh token.
-    - Verify that the endpoint returns a 404 error with the expected message.
-    """
     user_payload = {
         "email": "testuser@example.com",
         "password": "StrongPassword123!"
@@ -1161,8 +923,3 @@ async def test_refresh_access_token_user_not_found(client, db_session, jwt_manag
 
     assert refresh_response.status_code == 404, "Expected status code 404 for non-existent user."
     assert refresh_response.json()["detail"] == "User not found.", "Unexpected error message."
-
-
-
-
-

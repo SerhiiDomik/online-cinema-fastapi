@@ -11,16 +11,6 @@ from database import User, UserProfileModel
 @pytest.mark.order(10)
 @pytest.mark.asyncio
 async def test_create_user_profile(e2e_client, e2e_db_session, settings, s3_client, create_activated_user):
-    """
-    End-to-end test for creating a user profile with avatar upload (async + aioboto3.Session version).
-
-    Steps:
-    1. Authenticate a test user.
-    2. Upload an avatar via `POST /users/{user_id}/profile/`.
-    3. Verify that the profile was created successfully.
-    4. Verify that the avatar URL is valid.
-    5. Connect directly to MinIO (via aioboto3) and verify that the file exists.
-    """
 
     user_email = create_activated_user.email
     user_password = "NewSecurePassword123!"

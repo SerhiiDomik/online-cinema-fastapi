@@ -58,7 +58,10 @@ async def get_movie_list(
         year: int = None,
         min_rating: float = Query(None, ge=0, le=10),
         max_rating: float = Query(None, ge=0, le=10),
-        genre: Optional[str] = Query(None),
+        genre: Optional[List[str]] = Query(
+            default=None,
+            description="List of genres, e.g., genre=Action&genre=Drama"
+        ),
         certification: str = None,
         sort_by: str = Query(None, description="Sort by: price, year, imdb, votes"),
         search: str = None,
@@ -76,16 +79,8 @@ async def get_movie_list(
         stmt = stmt.where(MovieModel.imdb <= max_rating)
 
     if genre:
-        genre_names = []
-        for g in genre:
-            genre_names.extend([name.strip() for name in g.split(",")])
-        genre_names = list(set(genre_names))
-
-        stmt = (
-            stmt.join(MovieModel.genres)
-            .where(GenreModel.name.in_(genre_names))
-            .group_by(MovieModel.id)
-            .having(func.count(distinct(GenreModel.name)) == len(genre_names))
+        stmt = stmt.join(MovieModel.genres).group_by(MovieModel.id).having(
+            func.count(distinct(GenreModel.name)).filter(GenreModel.name.in_(genre)) == len(genre)
         )
 
     if certification:
