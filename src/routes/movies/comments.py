@@ -118,7 +118,7 @@ async def set_comment_reaction(
 
 
 @router.get(
-    "/{comment_id}",
+    "/{comment_id}/",
     response_model=CommentSchema,
     operation_id="get_comment_with_replies",
 )
