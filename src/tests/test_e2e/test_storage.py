@@ -8,7 +8,7 @@ from database import User, UserProfileModel
 
 
 @pytest.mark.e2e
-@pytest.mark.order(8)
+@pytest.mark.order(10)
 @pytest.mark.asyncio
 async def test_create_user_profile(e2e_client, e2e_db_session, settings, s3_client, create_activated_user):
     """

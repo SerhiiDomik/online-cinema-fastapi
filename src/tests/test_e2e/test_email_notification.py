@@ -392,7 +392,7 @@ async def test_user_login_with_new_password(e2e_client, e2e_db_session):
 
 
 @pytest.mark.e2e
-@pytest.mark.order(9)
+@pytest.mark.order(8)
 @pytest.mark.asyncio
 async def test_send_comment_reaction_email(
         e2e_client,
@@ -438,7 +438,7 @@ async def test_send_comment_reaction_email(
 
 
 @pytest.mark.e2e
-@pytest.mark.order(10)
+@pytest.mark.order(9)
 @pytest.mark.asyncio
 async def test_send_comment_reply_email(
         e2e_client,

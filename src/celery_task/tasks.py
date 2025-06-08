@@ -10,21 +10,26 @@ from database.models.users import (
     RefreshTokenModel
 )
 
+
+def _delete_expired_tokens_sync(session: Session):
+    now = datetime.now(timezone.utc)
+
+    session.execute(
+        delete(ActivationTokenModel)
+        .where(ActivationTokenModel.expires_at < now)
+    )
+    session.execute(
+        delete(PasswordResetTokenModel)
+        .where(PasswordResetTokenModel.expires_at < now)
+    )
+    session.execute(
+        delete(RefreshTokenModel)
+        .where(RefreshTokenModel.expires_at < now)
+    )
+    session.commit()
+
 @shared_task
 def delete_expired_tokens():
-    now = datetime.now(timezone.utc)
-    engine = sync_postgresql_engine()
-
+    engine = sync_postgresql_engine
     with Session(engine) as session:
-        session.execute(
-            delete(ActivationTokenModel)
-            .where(ActivationTokenModel.expires_at < now)
-        )
-        session.execute(
-            delete(PasswordResetTokenModel)
-            .where(PasswordResetTokenModel.expires_at < now)
-        )
-        session.execute(
-            delete(RefreshTokenModel)
-            .where(RefreshTokenModel.expires_at < now)
-        )
+        _delete_expired_tokens_sync(session)
