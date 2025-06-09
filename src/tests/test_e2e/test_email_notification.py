@@ -397,7 +397,6 @@ async def test_send_comment_reaction_email(
         settings,
         create_activated_user_with_token,
         create_movies,
-        default_user_group
 ):
     user1, token1 = await create_activated_user_with_token()
     user2, token2 = await create_activated_user_with_token()

@@ -82,6 +82,34 @@ async def test_get_movies_with_custom_parameters(client, create_movies):
 
 
 @pytest.mark.asyncio
+async def test_default_user_cannot_create_movie(create_default_user_with_token, client):
+    user, token =await create_default_user_with_token()
+
+    response = await client.post(
+        "/movies/",
+        json={
+            "name": "Test Movie",
+            "year": 2024,
+            "time": 120,
+            "imdb": 8.5,
+            "votes": 1000,
+            "meta_score": 75,
+            "gross": 1000000,
+            "description": "Test description",
+            "price": "9.99",
+            "certification": "PG-13",
+            "genres": ["Action"],
+            "directors": ["Test Director"],
+            "stars": ["Test Star"]
+        },
+        headers={"Authorization": f"Bearer {token}"}
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "You do not have permission to perform this action."
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("page, per_page, expected_detail", [
     (0, 10, "Input should be greater than or equal to 1"),
     (1, 0, "Input should be greater than or equal to 1"),
@@ -568,6 +596,21 @@ async def test_create_movie_duplicate_error(client, db_session, create_activated
 
 
 @pytest.mark.asyncio
+async def test_default_user_cannot_delete_movie(create_default_user_with_token, client, create_movies):
+    user, token =await create_default_user_with_token()
+    movies = await create_movies(1)
+    movie = movies[0]
+
+    response = await client.delete(
+        f"/movies/{movie.id}/",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "You do not have permission to perform this action."
+
+
+@pytest.mark.asyncio
 async def test_delete_movie_success(client, db_session, create_movies, create_activated_user_with_token):
     movies = await create_movies(1)
     movie_id  = movies[0].id
@@ -599,6 +642,22 @@ async def test_delete_movie_not_found(client, create_activated_user_with_token):
     response_data = response.json()
     expected_detail = "Movie with the given ID was not found."
     assert response_data["detail"] == expected_detail
+
+
+@pytest.mark.asyncio
+async def test_default_user_cannot_update_movie(create_default_user_with_token, client, create_movies):
+    user, token =await create_default_user_with_token()
+    movies = await create_movies(1)
+    movie = movies[0]
+
+    response = await client.patch(
+        f"/movies/{movie.id}/",
+        json={"name": "Updated Movie Name"},
+        headers={"Authorization": f"Bearer {token}"}
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "You do not have permission to perform this action."
 
 
 @pytest.mark.asyncio
