@@ -45,9 +45,6 @@ from security.interfaces import JWTAuthManagerInterface
 from security.http import get_token
 from storages import S3StorageInterface
 
-import logging
-logger = logging.getLogger(__name__)
-
 security = HTTPBearer()
 
 router = APIRouter()
@@ -628,7 +625,6 @@ async def create_profile(
         profile_data: ProfileCreateSchema = Depends(ProfileCreateSchema.from_form)
 ) -> ProfileResponseSchema:
     try:
-        logger.info(token)
         payload = jwt_manager.decode_access_token(token)
         token_user_id = int(payload.get("sub"))
     except BaseSecurityError as e:
@@ -682,7 +678,6 @@ async def create_profile(
     try:
         await s3_client.upload_file(file_name=avatar_key, file_data=avatar_bytes)
     except S3FileUploadError as e:
-        logger.error(f"S3 upload failed: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to upload avatar. Please try again later."
