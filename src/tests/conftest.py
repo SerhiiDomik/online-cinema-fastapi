@@ -206,7 +206,12 @@ async def seed_user_groups(db_session: AsyncSession):
 
 
 @pytest_asyncio.fixture
-async def default_user_group(e2e_db_session):
+async def admin_user_group(e2e_db_session):
+    """
+        Provide the 'ADMIN' user group.
+
+        If it doesn't exist, create and return it from the E2E database session.
+    """
     admin_group = await e2e_db_session.execute(
         select(UserGroup).filter_by(name="ADMIN")
     )
@@ -219,11 +224,34 @@ async def default_user_group(e2e_db_session):
 
 
 @pytest_asyncio.fixture
-async def create_user(e2e_db_session, default_user_group):
+async def user_group_user(e2e_db_session):
+    """
+    Provide the 'USER' user group.
+
+    If it doesn't exist, create and return it from the E2E database session.
+    """
+    user_group = await e2e_db_session.execute(
+        select(UserGroup).filter_by(name="USER")
+    )
+    group = user_group.scalars().first()
+    if not group:
+        group = UserGroup(name="USER")
+        e2e_db_session.add(group)
+        await e2e_db_session.commit()
+    return group
+
+
+@pytest_asyncio.fixture
+async def create_user(e2e_db_session, admin_user_group):
+    """
+    Create a non-activated admin user.
+
+    This user is created with a predefined email and password.
+    """
     user = User.create(
         email="newtest@email.com",
         raw_password="NewSecurePassword123!",
-        group_id=default_user_group.id
+        group_id=admin_user_group.id
     )
     e2e_db_session.add(user)
     await e2e_db_session.commit()
@@ -232,12 +260,15 @@ async def create_user(e2e_db_session, default_user_group):
 
 
 @pytest_asyncio.fixture
-async def create_activated_user(e2e_db_session, default_user_group):
+async def create_activated_user(e2e_db_session, admin_user_group):
+    """
+    Create and return an activated admin user with a random email.
+    """
     email = f"{uuid.uuid4().hex[:4]}@email.com"
     user = User.create(
         email=email,
         raw_password="NewSecurePassword123!",
-        group_id=default_user_group.id
+        group_id=admin_user_group.id
     )
     user.is_active = True
     e2e_db_session.add(user)
@@ -247,97 +278,81 @@ async def create_activated_user(e2e_db_session, default_user_group):
 
 
 @pytest_asyncio.fixture
-def create_activated_user_with_token(e2e_client: AsyncClient, e2e_db_session, default_user_group):
-    async def _create_user():
-        email = f"{uuid.uuid4().hex[:4]}@email.com"
-        raw_password = "Password123!"
+def create_user_with_token(e2e_client: AsyncClient, e2e_db_session):
+    def _factory(group_id: int):
+        async def _create_user():
+            email = f"{uuid.uuid4().hex[:4]}@email.com"
+            raw_password = "Password123!"
 
-        user = User.create(
-            email=email,
-            raw_password=raw_password,
-            group_id=default_user_group.id,
-        )
-        user.is_active = True
+            user = User.create(
+                email=email,
+                raw_password=raw_password,
+                group_id=group_id,
+            )
+            user.is_active = True
+            e2e_db_session.add(user)
+            await e2e_db_session.commit()
+            await e2e_db_session.refresh(user)
 
-        e2e_db_session.add(user)
-        await e2e_db_session.commit()
-        await e2e_db_session.refresh(user)
+            response = await e2e_client.post(
+                "/users/login/",
+                json={"email": email, "password": raw_password}
+            )
+            access_token = response.json()["access_token"]
+            return user, access_token
 
-        response = await e2e_client.post(
-            "/users/login/",
-            json={"email": email, "password": raw_password}
-        )
+        return _create_user
+    return _factory
 
-        tokens = response.json()
-        access_token = tokens["access_token"]
 
-        return user, access_token
+@pytest_asyncio.fixture
+def create_activated_user_with_token(create_user_with_token, admin_user_group):
+    return create_user_with_token(admin_user_group.id)
 
-    return _create_user
+
+@pytest_asyncio.fixture
+def create_default_user_with_token(create_user_with_token, user_group_user):
+    return create_user_with_token(user_group_user.id)
 
 
 @pytest_asyncio.fixture
 def create_movies(db_session):
-    async def _create_movies(count: int, **overrides) -> List[MovieModel]:
+    """
+    Return a function to create a specified number of movies with related genres, certification, directors, and stars.
 
-        genres_input = overrides.pop("genres", ["Test genre"])
-        if isinstance(genres_input, str):
-            genres_input = [genres_input]
-        genres = []
-        for genre_name in genres_input:
+    Accepts overrides for genres, certification name, directors, and stars.
+    """
+    async def get_or_create_by_name(model, name_field: str, names: list[str]) -> list:
+        """Generic helper to get or create instances by name."""
+        instances = []
+        for name in names:
             result = await db_session.execute(
-                select(GenreModel).where(GenreModel.name == genre_name)
+                select(model).where(getattr(model, name_field) == name)
             )
-            genre = result.scalars().first()
-            if not genre:
-                genre = GenreModel(name=genre_name)
-                db_session.add(genre)
+            instance = result.scalars().first()
+            if not instance:
+                instance = model(**{name_field: name})
+                db_session.add(instance)
                 await db_session.commit()
-                await db_session.refresh(genre)
-            genres.append(genre)
+                await db_session.refresh(instance)
+            instances.append(instance)
+        return instances
+
+    async def _create_movies(count: int, **overrides) -> List[MovieModel]:
+        genres_input = overrides.pop("genres", ["Test genre"])
+        genres_input = [genres_input] if isinstance(genres_input, str) else genres_input
+        genres = await get_or_create_by_name(GenreModel, "name", genres_input)
 
         certification_name: str = overrides.pop("certification_name", "Test Certification")
-        result = await db_session.execute(
-            select(CertificationModel).where(CertificationModel.name == certification_name)
-        )
-        certification = result.scalars().first()
-        if not certification:
-            certification = CertificationModel(name=certification_name)
-            db_session.add(certification)
-            await db_session.commit()
-            await db_session.refresh(certification)
+        certification = (await get_or_create_by_name(CertificationModel, "name", [certification_name]))[0]
 
         directors_input = overrides.pop("directors", ["Test Director"])
-        if isinstance(directors_input, str):
-            directors_input = [directors_input]
-        directors = []
-        for director_name in directors_input:
-            result = await db_session.execute(
-                select(DirectorModel).where(DirectorModel.name == director_name)
-            )
-            director = result.scalars().first()
-            if not director:
-                director = DirectorModel(name=director_name)
-                db_session.add(director)
-                await db_session.commit()
-                await db_session.refresh(director)
-            directors.append(director)
+        directors_input = [directors_input] if isinstance(directors_input, str) else directors_input
+        directors = await get_or_create_by_name(DirectorModel, "name", directors_input)
 
         stars_input = overrides.pop("stars", ["Test Star"])
-        if isinstance(stars_input, str):
-            stars_input = [stars_input]
-        stars = []
-        for star_name in stars_input:
-            result = await db_session.execute(
-                select(StarModel).where(StarModel.name == star_name)
-            )
-            star = result.scalars().first()
-            if not star:
-                star = StarModel(name=star_name)
-                db_session.add(star)
-                await db_session.commit()
-                await db_session.refresh(star)
-            stars.append(star)
+        stars_input = [stars_input] if isinstance(stars_input, str) else stars_input
+        stars = await get_or_create_by_name(StarModel, "name", stars_input)
 
         movies = []
         for i in range(count):
@@ -354,13 +369,9 @@ def create_movies(db_session):
                 price=overrides.get("price", Decimal("9.99")),
                 certification_id=certification.id,
             )
-            for g in genres:
-                movie.genres.append(g)
-            for d in directors:
-                movie.directors.append(d)
-            for s in stars:
-                movie.stars.append(s)
-
+            movie.genres.extend(genres)
+            movie.directors.extend(directors)
+            movie.stars.extend(stars)
             movies.append(movie)
 
         db_session.add_all(movies)

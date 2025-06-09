@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 from typing import Optional
 
-from database import get_db, User
+from database import get_db, User, UserGroupEnum
 from database.models import (
     MovieModel,
     GenreModel,
@@ -19,7 +19,13 @@ from database.models import (
     CertificationModel,
 )
 from database.models.movies import CommentModel, MovieRatingModel, MovieReactionModel, ReactionEnum
-from routes.dependencies import get_current_user, parse_comment_with_replies_model
+from routes.dependencies import (
+    get_current_user,
+    parse_comment_with_replies_model,
+    require_admin_or_moderator,
+    get_or_create_entities_by_names,
+    update_relation_if_present,
+)
 from schemas.movies import (
     MovieListResponseSchema,
     MovieListItemSchema,
@@ -159,7 +165,7 @@ async def get_movie_list(
     "/",
     response_model=MovieDetailSchema,
     summary="Add a new movie",
-    dependencies=[Depends(security)],
+    dependencies=[Depends(security), Depends(require_admin_or_moderator)],
     responses={
         201: {
             "description": "Movie created successfully.",
@@ -177,7 +183,7 @@ async def get_movie_list(
 )
 async def create_movie(
         movie_data: MovieCreateSchema,
-        db: AsyncSession = Depends(get_db)
+        db: AsyncSession = Depends(get_db),
 ) -> MovieDetailSchema:
 
     existing = await db.execute(
@@ -205,35 +211,9 @@ async def create_movie(
         await db.flush()
 
     try:
-        genres = []
-        for genre_name in movie_data.genres:
-            genre = await db.execute(select(GenreModel).where(GenreModel.name == genre_name))
-            genre = genre.scalar_one_or_none()
-            if not genre:
-                genre = GenreModel(name=genre_name)
-                db.add(genre)
-                await db.flush()
-            genres.append(genre)
-
-        directors = []
-        for director_name in movie_data.directors:
-            director = await db.execute(select(DirectorModel).where(DirectorModel.name == director_name))
-            director = director.scalar_one_or_none()
-            if not director:
-                director = DirectorModel(name=director_name)
-                db.add(director)
-                await db.flush()
-            directors.append(director)
-
-        stars = []
-        for star_name in movie_data.stars:
-            star = await db.execute(select(StarModel).where(StarModel.name == star_name))
-            star = star.scalar_one_or_none()
-            if not star:
-                star = StarModel(name=star_name)
-                db.add(star)
-                await db.flush()
-            stars.append(star)
+        genres = await get_or_create_entities_by_names(db, GenreModel, movie_data.genres)
+        directors = await get_or_create_entities_by_names(db, DirectorModel, movie_data.directors)
+        stars = await get_or_create_entities_by_names(db, StarModel, movie_data.stars)
 
         movie = MovieModel(
             uuid=str(uuid.uuid4()),
@@ -350,7 +330,7 @@ async def get_movie_by_id(
 @router.delete(
     "/{movie_id}/",
     summary="Delete a movie by ID",
-    dependencies=[Depends(security)],
+    dependencies=[Depends(security), Depends(require_admin_or_moderator)],
     responses={
         204: {
             "description": "Movie deleted successfully."
@@ -390,7 +370,7 @@ async def delete_movie(
 @router.patch(
     "/{movie_id}/",
     summary="Update a movie by ID",
-    dependencies=[Depends(security)],
+    dependencies=[Depends(security), Depends(require_admin_or_moderator)],
     responses={
         200: {
             "description": "Movie updated successfully.",
@@ -449,40 +429,16 @@ async def update_movie(
             await db.flush()
         movie.certification_id = cert.id
 
-    if movie_data.genres is not None:
-        new_genres = []
-        for genre_name in movie_data.genres:
-            genre = await db.execute(select(GenreModel).where(GenreModel.name == genre_name))
-            genre = genre.scalar_one_or_none()
-            if not genre:
-                genre = GenreModel(name=genre_name)
-                db.add(genre)
-                await db.flush()
-            new_genres.append(genre)
+    new_genres = await update_relation_if_present(db, GenreModel, movie_data.genres)
+    if new_genres is not None:
         movie.genres = new_genres
 
-    if movie_data.directors is not None:
-        new_directors = []
-        for director_name in movie_data.directors:
-            director = await db.execute(select(DirectorModel).where(DirectorModel.name == director_name))
-            director = director.scalar_one_or_none()
-            if not director:
-                director = DirectorModel(name=director_name)
-                db.add(director)
-                await db.flush()
-            new_directors.append(director)
+    new_directors = await update_relation_if_present(db, DirectorModel, movie_data.directors)
+    if new_directors is not None:
         movie.directors = new_directors
 
-    if movie_data.stars is not None:
-        new_stars = []
-        for star_name in movie_data.stars:
-            star = await db.execute(select(StarModel).where(StarModel.name == star_name))
-            star = star.scalar_one_or_none()
-            if not star:
-                star = StarModel(name=star_name)
-                db.add(star)
-                await db.flush()
-            new_stars.append(star)
+    new_stars = await update_relation_if_present(db, StarModel, movie_data.stars)
+    if new_stars is not None:
         movie.stars = new_stars
 
     try:
