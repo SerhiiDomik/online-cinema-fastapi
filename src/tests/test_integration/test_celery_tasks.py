@@ -2,7 +2,7 @@ import pytest
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import insert, select
 
-from celery_task.tasks import _delete_expired_tokens_sync
+from celery_task.tasks import delete_expired_tokens_sync
 from database.models.users import (
     ActivationTokenModel,
     PasswordResetTokenModel,
@@ -38,7 +38,7 @@ async def test_delete_expired_tokens(db_session):
     )
     await db_session.commit()
 
-    await db_session.run_sync(_delete_expired_tokens_sync)
+    await db_session.run_sync(delete_expired_tokens_sync)
 
     remaining = await db_session.execute(select(ActivationTokenModel))
     remaining_tokens = remaining.scalars().all()

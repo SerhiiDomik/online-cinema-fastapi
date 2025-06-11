@@ -11,7 +11,7 @@ from database.models.users import (
 )
 
 
-def _delete_expired_tokens_sync(session: Session):
+def delete_expired_tokens_sync(session: Session):
     now = datetime.now(timezone.utc)
 
     session.execute(
@@ -28,4 +28,4 @@ def _delete_expired_tokens_sync(session: Session):
 def delete_expired_tokens():
     engine = sync_postgresql_engine
     with Session(engine) as session:
-        _delete_expired_tokens_sync(session)
+        delete_expired_tokens_sync(session)
