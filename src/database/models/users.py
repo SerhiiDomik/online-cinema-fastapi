@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime, date, timedelta, timezone
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 
 from sqlalchemy import (
     ForeignKey,
@@ -17,18 +17,18 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from database.models.base import Base
-from database.models.movies import (
-    CommentModel,
-    MovieReactionModel,
-    MovieRatingModel,
-    FavoriteMoviesModel,
-    CommentReactionModel,
-)
 
 from database.validators import users as validators
 from security.passwords import hash_password, verify_password
 from security.utils import generate_secure_token
-
+if TYPE_CHECKING:
+    from database.models.movies import (
+        CommentModel,
+        MovieReactionModel,
+        MovieRatingModel,
+        FavoriteMoviesModel,
+        CommentReactionModel,
+    )
 
 class UserGroupEnum(str, enum.Enum):
     USER = "user"

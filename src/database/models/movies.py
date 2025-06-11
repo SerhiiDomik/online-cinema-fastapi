@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from sqlalchemy import (
     String,
@@ -18,7 +18,9 @@ from sqlalchemy import (
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 
 from database.models.base import Base
-from database.models.users import User
+
+if TYPE_CHECKING:
+    from database.models.users import User
 
 
 class ReactionEnum(str, Enum):
