@@ -7,7 +7,7 @@ from database.session_postgresql import sync_postgresql_engine
 from database.models.users import (
     ActivationTokenModel,
     PasswordResetTokenModel,
-    RefreshTokenModel
+    RefreshTokenModel,
 )
 
 
@@ -15,18 +15,14 @@ def _delete_expired_tokens_sync(session: Session):
     now = datetime.now(timezone.utc)
 
     session.execute(
-        delete(ActivationTokenModel)
-        .where(ActivationTokenModel.expires_at < now)
+        delete(ActivationTokenModel).where(ActivationTokenModel.expires_at < now)
     )
     session.execute(
-        delete(PasswordResetTokenModel)
-        .where(PasswordResetTokenModel.expires_at < now)
+        delete(PasswordResetTokenModel).where(PasswordResetTokenModel.expires_at < now)
     )
-    session.execute(
-        delete(RefreshTokenModel)
-        .where(RefreshTokenModel.expires_at < now)
-    )
+    session.execute(delete(RefreshTokenModel).where(RefreshTokenModel.expires_at < now))
     session.commit()
+
 
 @shared_task
 def delete_expired_tokens():

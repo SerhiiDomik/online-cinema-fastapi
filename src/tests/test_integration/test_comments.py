@@ -1,8 +1,11 @@
 import pytest
 from database.models.movies import ReactionEnum
 
+
 @pytest.mark.asyncio
-async def test_reply_to_comment_success(client, create_activated_user_with_token, create_movies):
+async def test_reply_to_comment_success(
+    client, create_activated_user_with_token, create_movies
+):
     user, token = await create_activated_user_with_token()
     movies = await create_movies(1)
     movie = movies[0]
@@ -44,7 +47,9 @@ async def test_reply_to_nonexistent_comment(client, create_activated_user_with_t
 
 
 @pytest.mark.asyncio
-async def test_reply_to_comment_unauthorized(client, create_activated_user_with_token, create_movies):
+async def test_reply_to_comment_unauthorized(
+    client, create_activated_user_with_token, create_movies
+):
     _, token = await create_activated_user_with_token()
     movies = await create_movies(1)
     movie = movies[0]
@@ -65,7 +70,9 @@ async def test_reply_to_comment_unauthorized(client, create_activated_user_with_
 
 
 @pytest.mark.asyncio
-async def test_reply_to_comment_invalid_data(client, create_activated_user_with_token, create_movies):
+async def test_reply_to_comment_invalid_data(
+    client, create_activated_user_with_token, create_movies
+):
     _, token = await create_activated_user_with_token()
     movies = await create_movies(1)
     movie = movies[0]
@@ -87,7 +94,9 @@ async def test_reply_to_comment_invalid_data(client, create_activated_user_with_
 
 
 @pytest.mark.asyncio
-async def test_comment_reaction_success(client, create_activated_user_with_token, create_movies):
+async def test_comment_reaction_success(
+    client, create_activated_user_with_token, create_movies
+):
     user, token = await create_activated_user_with_token()
     movies = await create_movies(1)
     movie = movies[0]
@@ -148,7 +157,9 @@ async def test_reaction_reply(client, create_activated_user_with_token, create_m
 
 
 @pytest.mark.asyncio
-async def test_update_reaction_with_counts(client, create_activated_user_with_token, create_movies):
+async def test_update_reaction_with_counts(
+    client, create_activated_user_with_token, create_movies
+):
     user, token = await create_activated_user_with_token()
     movies = await create_movies(1)
     movie = movies[0]
@@ -201,7 +212,9 @@ async def test_update_reaction_with_counts(client, create_activated_user_with_to
 
 
 @pytest.mark.asyncio
-async def test_multiple_users_reactions(client, create_activated_user_with_token, create_movies):
+async def test_multiple_users_reactions(
+    client, create_activated_user_with_token, create_movies
+):
     user1, token1 = await create_activated_user_with_token()
     user2, token2 = await create_activated_user_with_token()
     movies = await create_movies(1)
@@ -247,7 +260,9 @@ async def test_multiple_users_reactions(client, create_activated_user_with_token
 
 
 @pytest.mark.asyncio
-async def test_reaction_to_nonexistent_comment(client, create_activated_user_with_token):
+async def test_reaction_to_nonexistent_comment(
+    client, create_activated_user_with_token
+):
     _, token = await create_activated_user_with_token()
 
     response = await client.post(
@@ -269,7 +284,9 @@ async def test_reaction_unauthorized(client):
 
 
 @pytest.mark.asyncio
-async def test_get_comment_with_replies_full(client, create_activated_user_with_token, create_movies):
+async def test_get_comment_with_replies_full(
+    client, create_activated_user_with_token, create_movies
+):
     user1, token1 = await create_activated_user_with_token()
     user2, token2 = await create_activated_user_with_token()
     movies = await create_movies(1)
@@ -287,7 +304,6 @@ async def test_get_comment_with_replies_full(client, create_activated_user_with_
         headers={"Authorization": f"Bearer {token2}"},
     )
     root2_id = root2.json()["id"]
-
 
     reply1 = await client.post(
         f"/comments/{root1_id}/reply/",
@@ -308,7 +324,6 @@ async def test_get_comment_with_replies_full(client, create_activated_user_with_
     )
     nested_reply1_id = nested_reply1.json()["id"]
 
-
     await client.post(
         f"/comments/{reply1_id}/reaction/",
         json={"reaction": ReactionEnum.LIKE.value},
@@ -326,7 +341,6 @@ async def test_get_comment_with_replies_full(client, create_activated_user_with_
         headers={"Authorization": f"Bearer {token2}"},
     )
 
-
     response = await client.get(f"/comments/{root1_id}/")
     assert response.status_code == 200
     data = response.json()
@@ -343,7 +357,6 @@ async def test_get_comment_with_replies_full(client, create_activated_user_with_
     assert nested_reply1_data["id"] == nested_reply1_id
     assert nested_reply1_data["likes_count"] == 0
     assert nested_reply1_data["dislikes_count"] == 1
-
 
     response = await client.get(f"/comments/{reply1_id}/")
     assert response.status_code == 200

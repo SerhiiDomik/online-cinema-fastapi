@@ -12,7 +12,9 @@ class StubEmailSender(EmailSenderInterface):
     async def send_password_reset_email(self, email: str, reset_link: str) -> None:
         return None
 
-    async def send_password_reset_complete_email(self, email: str, login_link: str) -> None:
+    async def send_password_reset_complete_email(
+        self, email: str, login_link: str
+    ) -> None:
         return None
 
     async def send_comment_reaction_notification(
@@ -20,7 +22,7 @@ class StubEmailSender(EmailSenderInterface):
         email: str,
         reacting_user_email: str,
         reaction_type: str,
-        comment_content: str
+        comment_content: str,
     ) -> None:
         return None
 
@@ -29,6 +31,6 @@ class StubEmailSender(EmailSenderInterface):
         email: str,
         replying_user_email: str,
         parent_comment_content: str,
-        reply_content: str
+        reply_content: str,
     ) -> None:
         return None

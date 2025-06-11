@@ -16,7 +16,9 @@ class EmailSenderInterface(ABC):
         pass
 
     @abstractmethod
-    async def send_password_reset_complete_email(self, email: str, login_link: str) -> None:
+    async def send_password_reset_complete_email(
+        self, email: str, login_link: str
+    ) -> None:
         pass
 
     @abstractmethod
@@ -25,7 +27,7 @@ class EmailSenderInterface(ABC):
         email: str,
         reacting_user_email: str,
         reaction_type: str,
-        comment_content: str
+        comment_content: str,
     ) -> None:
         pass
 
@@ -35,6 +37,6 @@ class EmailSenderInterface(ABC):
         email: str,
         replying_user_email: str,
         parent_comment_content: str,
-        reply_content: str
+        reply_content: str,
     ) -> None:
         pass

@@ -15,10 +15,7 @@ router = APIRouter()
 security = HTTPBearer()
 
 
-@router.get(
-    "/",
-    response_model=List[GenreReadSchema]
-)
+@router.get("/", response_model=List[GenreReadSchema])
 async def get_genres(db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(GenreModel).options(selectinload(GenreModel.movies))
@@ -46,7 +43,9 @@ async def get_genres(db: AsyncSession = Depends(get_db)):
     dependencies=[Depends(security)],
 )
 async def create_genre(payload: GenreCreateSchema, db: AsyncSession = Depends(get_db)):
-    existing = await db.execute(select(GenreModel).where(GenreModel.name == payload.name))
+    existing = await db.execute(
+        select(GenreModel).where(GenreModel.name == payload.name)
+    )
     if existing.scalar():
         raise HTTPException(400, "Genre already exists")
 

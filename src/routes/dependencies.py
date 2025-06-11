@@ -14,9 +14,9 @@ from typing import Type, List, Optional
 
 
 async def get_current_user(
-        token: str = Depends(oauth2_scheme),
-        jwt_auth: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
-        db: AsyncSession = Depends(get_db)
+    token: str = Depends(oauth2_scheme),
+    jwt_auth: JWTAuthManagerInterface = Depends(get_jwt_auth_manager),
+    db: AsyncSession = Depends(get_db),
 ) -> User:
 
     credentials_exception = HTTPException(
@@ -32,11 +32,7 @@ async def get_current_user(
     except (JWTError, ValueError, AttributeError):
         raise credentials_exception
 
-    stmt = (
-        select(User)
-        .options(selectinload(User.group))
-        .where(User.id == user_id)
-    )
+    stmt = select(User).options(selectinload(User.group)).where(User.id == user_id)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     if not user:
@@ -55,24 +51,28 @@ def parse_comment_with_replies_model(comment: CommentModel) -> CommentSchema:
         user_email=comment.user.email,
         parent_id=comment.parent_id,
         replies=[parse_comment_with_replies_model(reply) for reply in comment.replies],
-        likes_count=len([r for r in comment.reactions if r.reaction == ReactionEnum.LIKE]),
-        dislikes_count=len([r for r in comment.reactions if r.reaction == ReactionEnum.DISLIKE])
+        likes_count=len(
+            [r for r in comment.reactions if r.reaction == ReactionEnum.LIKE]
+        ),
+        dislikes_count=len(
+            [r for r in comment.reactions if r.reaction == ReactionEnum.DISLIKE]
+        ),
     )
 
+
 async def require_admin_or_moderator(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ) -> User:
     if current_user.group.name not in (UserGroupEnum.ADMIN, UserGroupEnum.MODERATOR):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to perform this action."
+            detail="You do not have permission to perform this action.",
         )
     return current_user
 
+
 async def get_or_create_entities_by_names(
-    db: AsyncSession,
-    model: Type[DeclarativeMeta],
-    names: List[str]
+    db: AsyncSession, model: Type[DeclarativeMeta], names: List[str]
 ) -> List[DeclarativeMeta]:
 
     result = []
@@ -86,10 +86,9 @@ async def get_or_create_entities_by_names(
         result.append(instance)
     return result
 
+
 async def update_relation_if_present(
-    db: AsyncSession,
-    model: Type[DeclarativeMeta],
-    names: Optional[List[str]]
+    db: AsyncSession, model: Type[DeclarativeMeta], names: Optional[List[str]]
 ) -> Optional[List[DeclarativeMeta]]:
     if names is None:
         return None

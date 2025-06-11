@@ -194,7 +194,7 @@ class GenreReadSchema(BaseModel):
                 "id": 1,
                 "name": "Action",
                 "movie_count": 3,
-                "movie_ids": [101, 102, 103]
+                "movie_ids": [101, 102, 103],
             }
         }
 

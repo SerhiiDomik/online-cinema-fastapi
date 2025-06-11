@@ -22,14 +22,15 @@ security = HTTPBearer()
     "/{comment_id}/reply/",
     response_model=CommentSchema,
     dependencies=[Depends(security)],
-    status_code=status.HTTP_201_CREATED)
+    status_code=status.HTTP_201_CREATED,
+)
 async def reply_to_comment(
-        comment_id: int,
-        comment_data: CommentCreate,
-        background_tasks: BackgroundTasks,
-        db: AsyncSession = Depends(get_db),
-        current_user: User = Depends(get_current_user),
-        email_sender: EmailSenderInterface = Depends(get_users_email_notificator)
+    comment_id: int,
+    comment_data: CommentCreate,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    email_sender: EmailSenderInterface = Depends(get_users_email_notificator),
 ):
     parent_comment = await db.get(CommentModel, comment_id)
     if not parent_comment:
@@ -39,7 +40,7 @@ async def reply_to_comment(
         content=comment_data.content,
         user_id=current_user.id,
         movie_id=parent_comment.movie_id,
-        parent_id=comment_id
+        parent_id=comment_id,
     )
 
     db.add(new_comment)
@@ -52,7 +53,7 @@ async def reply_to_comment(
             parent_comment.user.email,
             current_user.email,
             parent_comment.content,
-            new_comment.content
+            new_comment.content,
         )
 
     new_comment.user_email = current_user.email
@@ -65,12 +66,12 @@ async def reply_to_comment(
     dependencies=[Depends(security)],
 )
 async def set_comment_reaction(
-        comment_id: int,
-        reaction_data: ReactionRequest,
-        background_tasks: BackgroundTasks,
-        db: AsyncSession = Depends(get_db),
-        current_user: User = Depends(get_current_user),
-        email_sender: EmailSenderInterface = Depends(get_users_email_notificator),
+    comment_id: int,
+    reaction_data: ReactionRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    email_sender: EmailSenderInterface = Depends(get_users_email_notificator),
 ):
     comment = await db.get(CommentModel, comment_id)
     if not comment:
@@ -80,7 +81,7 @@ async def set_comment_reaction(
         select(CommentReactionModel).where(
             and_(
                 CommentReactionModel.user_id == current_user.id,
-                CommentReactionModel.comment_id == comment_id
+                CommentReactionModel.comment_id == comment_id,
             )
         )
     )
@@ -98,9 +99,7 @@ async def set_comment_reaction(
             existing_reaction.reaction = reaction
         else:
             new_reaction = CommentReactionModel(
-                user_id=current_user.id,
-                comment_id=comment_id,
-                reaction=reaction
+                user_id=current_user.id, comment_id=comment_id, reaction=reaction
             )
             db.add(new_reaction)
         await db.commit()
@@ -111,7 +110,7 @@ async def set_comment_reaction(
             comment.user.email,
             current_user.email,
             reaction.value,
-            comment.content
+            comment.content,
         )
 
     return {"detail": "Reaction updated"}
@@ -123,16 +122,13 @@ async def set_comment_reaction(
     operation_id="get_comment_with_replies",
 )
 async def get_comment_with_replies(
-        comment_id: int,
-        db: AsyncSession = Depends(get_db),
+    comment_id: int,
+    db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
         select(CommentModel)
         .where(CommentModel.id == comment_id)
-        .options(
-            joinedload(CommentModel.user),
-            selectinload(CommentModel.reactions)
-        )
+        .options(joinedload(CommentModel.user), selectinload(CommentModel.reactions))
     )
     main_comment = result.scalar_one_or_none()
 
@@ -142,10 +138,7 @@ async def get_comment_with_replies(
     result_all = await db.execute(
         select(CommentModel)
         .where(CommentModel.movie_id == main_comment.movie_id)
-        .options(
-            joinedload(CommentModel.user),
-            selectinload(CommentModel.reactions)
-        )
+        .options(joinedload(CommentModel.user), selectinload(CommentModel.reactions))
     )
     all_comments = result_all.unique().scalars().all()
 
@@ -161,9 +154,13 @@ async def get_comment_with_replies(
             "movie_id": comment.movie_id,
             "parent_id": comment.parent_id,
             "user_email": comment.user.email,
-            "likes_count": sum(1 for r in comment.reactions if r.reaction == ReactionEnum.LIKE),
-            "dislikes_count": sum(1 for r in comment.reactions if r.reaction == ReactionEnum.DISLIKE),
-            "replies": []
+            "likes_count": sum(
+                1 for r in comment.reactions if r.reaction == ReactionEnum.LIKE
+            ),
+            "dislikes_count": sum(
+                1 for r in comment.reactions if r.reaction == ReactionEnum.DISLIKE
+            ),
+            "replies": [],
         }
 
     def build_comment_tree(parent_id=None):

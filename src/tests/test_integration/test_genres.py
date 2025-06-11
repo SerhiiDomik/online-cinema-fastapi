@@ -12,7 +12,9 @@ async def test_get_genres_empty(client):
 
 
 @pytest.mark.asyncio
-async def test_create_genre_success(client, db_session, create_activated_user_with_token):
+async def test_create_genre_success(
+    client, db_session, create_activated_user_with_token
+):
     _, token = await create_activated_user_with_token()
     headers = {"Authorization": f"Bearer {token}"}
     payload = {"name": "Action"}
@@ -88,4 +90,6 @@ async def test_deleting_movie_does_not_delete_genres(db_session, create_movies):
         select(GenreModel).where(GenreModel.name == genre_name)
     )
     genre_after_delete = result.scalars().first()
-    assert genre_after_delete is not None, "Genre should not be deleted after movie deletion"
+    assert (
+        genre_after_delete is not None
+    ), "Genre should not be deleted after movie deletion"

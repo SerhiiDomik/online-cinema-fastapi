@@ -4,7 +4,7 @@ from .users import (
     UserGroup,
     ActivationTokenModel,
     PasswordResetTokenModel,
-    RefreshTokenModel
+    RefreshTokenModel,
 )
 from .movies import (
     MovieModel,

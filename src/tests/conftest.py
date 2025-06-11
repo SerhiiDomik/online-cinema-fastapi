@@ -9,17 +9,14 @@ from httpx import AsyncClient, ASGITransport
 from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import (
-    get_settings,
-    get_users_email_notificator,
-    get_s3_storage_client
-)
+from config import get_settings, get_users_email_notificator, get_s3_storage_client
 from database import (
     reset_database,
     get_db_contextmanager,
     UserGroupEnum,
     UserGroup,
-    User, GenreModel,
+    User,
+    GenreModel,
 )
 from database.models import MovieModel, CertificationModel, StarModel, DirectorModel
 from main import app
@@ -33,15 +30,9 @@ os.environ["ENVIRONMENT"] = "testing"
 
 
 def pytest_configure(config):
-    config.addinivalue_line(
-        "markers", "e2e: End-to-end tests"
-    )
-    config.addinivalue_line(
-        "markers", "order: Specify the order of test execution"
-    )
-    config.addinivalue_line(
-        "markers", "unit: Unit tests"
-    )
+    config.addinivalue_line("markers", "e2e: End-to-end tests")
+    config.addinivalue_line("markers", "order: Specify the order of test execution")
+    config.addinivalue_line("markers", "unit: Unit tests")
 
 
 @pytest_asyncio.fixture(scope="function", autouse=True)
@@ -112,7 +103,7 @@ async def s3_client(settings):
         endpoint_url=settings.S3_STORAGE_ENDPOINT,
         access_key=settings.S3_STORAGE_ACCESS_KEY,
         secret_key=settings.S3_STORAGE_SECRET_KEY,
-        bucket_name=settings.S3_BUCKET_NAME
+        bucket_name=settings.S3_BUCKET_NAME,
     )
 
 
@@ -126,7 +117,9 @@ async def client(email_sender_stub, s3_storage_fake):
     app.dependency_overrides[get_users_email_notificator] = lambda: email_sender_stub
     app.dependency_overrides[get_s3_storage_client] = lambda: s3_storage_fake
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as async_client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as async_client:
         yield async_client
 
     app.dependency_overrides.clear()
@@ -140,7 +133,9 @@ async def e2e_client():
     This client is available at the session scope.
     """
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as async_client:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as async_client:
         yield async_client
 
 
@@ -187,7 +182,7 @@ async def jwt_manager() -> JWTAuthManagerInterface:
     return JWTAuthManager(
         secret_key_access=settings.SECRET_KEY_ACCESS,
         secret_key_refresh=settings.SECRET_KEY_REFRESH,
-        algorithm=settings.JWT_SIGNING_ALGORITHM
+        algorithm=settings.JWT_SIGNING_ALGORITHM,
     )
 
 
@@ -208,9 +203,9 @@ async def seed_user_groups(db_session: AsyncSession):
 @pytest_asyncio.fixture
 async def admin_user_group(e2e_db_session):
     """
-        Provide the 'ADMIN' user group.
+    Provide the 'ADMIN' user group.
 
-        If it doesn't exist, create and return it from the E2E database session.
+    If it doesn't exist, create and return it from the E2E database session.
     """
     admin_group = await e2e_db_session.execute(
         select(UserGroup).filter_by(name="ADMIN")
@@ -230,9 +225,7 @@ async def user_group_user(e2e_db_session):
 
     If it doesn't exist, create and return it from the E2E database session.
     """
-    user_group = await e2e_db_session.execute(
-        select(UserGroup).filter_by(name="USER")
-    )
+    user_group = await e2e_db_session.execute(select(UserGroup).filter_by(name="USER"))
     group = user_group.scalars().first()
     if not group:
         group = UserGroup(name="USER")
@@ -251,7 +244,7 @@ async def create_user(e2e_db_session, admin_user_group):
     user = User.create(
         email="newtest@email.com",
         raw_password="NewSecurePassword123!",
-        group_id=admin_user_group.id
+        group_id=admin_user_group.id,
     )
     e2e_db_session.add(user)
     await e2e_db_session.commit()
@@ -266,9 +259,7 @@ async def create_activated_user(e2e_db_session, admin_user_group):
     """
     email = f"{uuid.uuid4().hex[:4]}@email.com"
     user = User.create(
-        email=email,
-        raw_password="NewSecurePassword123!",
-        group_id=admin_user_group.id
+        email=email, raw_password="NewSecurePassword123!", group_id=admin_user_group.id
     )
     user.is_active = True
     e2e_db_session.add(user)
@@ -295,13 +286,13 @@ def create_user_with_token(e2e_client: AsyncClient, e2e_db_session):
             await e2e_db_session.refresh(user)
 
             response = await e2e_client.post(
-                "/users/login/",
-                json={"email": email, "password": raw_password}
+                "/users/login/", json={"email": email, "password": raw_password}
             )
             access_token = response.json()["access_token"]
             return user, access_token
 
         return _create_user
+
     return _factory
 
 
@@ -322,6 +313,7 @@ def create_movies(db_session):
 
     Accepts overrides for genres, certification name, directors, and stars.
     """
+
     async def get_or_create_by_name(model, name_field: str, names: list[str]) -> list:
         """Generic helper to get or create instances by name."""
         instances = []
@@ -343,11 +335,19 @@ def create_movies(db_session):
         genres_input = [genres_input] if isinstance(genres_input, str) else genres_input
         genres = await get_or_create_by_name(GenreModel, "name", genres_input)
 
-        certification_name: str = overrides.pop("certification_name", "Test Certification")
-        certification = (await get_or_create_by_name(CertificationModel, "name", [certification_name]))[0]
+        certification_name: str = overrides.pop(
+            "certification_name", "Test Certification"
+        )
+        certification = (
+            await get_or_create_by_name(
+                CertificationModel, "name", [certification_name]
+            )
+        )[0]
 
         directors_input = overrides.pop("directors", ["Test Director"])
-        directors_input = [directors_input] if isinstance(directors_input, str) else directors_input
+        directors_input = (
+            [directors_input] if isinstance(directors_input, str) else directors_input
+        )
         directors = await get_or_create_by_name(DirectorModel, "name", directors_input)
 
         stars_input = overrides.pop("stars", ["Test Star"])

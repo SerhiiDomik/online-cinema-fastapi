@@ -8,7 +8,9 @@ class FakeS3Storage(S3StorageInterface):
     def __init__(self):
         self.storage: Dict[str, bytes] = {}
 
-    async def upload_file(self, file_name: str, file_data: Union[bytes, bytearray]) -> None:
+    async def upload_file(
+        self, file_name: str, file_data: Union[bytes, bytearray]
+    ) -> None:
         self.storage[file_name] = file_data
 
     async def get_file_url(self, file_name: str) -> str:
