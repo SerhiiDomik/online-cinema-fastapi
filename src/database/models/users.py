@@ -21,6 +21,7 @@ from database.models.base import Base
 from database.validators import users as validators
 from security.passwords import hash_password, verify_password
 from security.utils import generate_secure_token
+
 if TYPE_CHECKING:
     from database.models.movies import (
         CommentModel,
@@ -29,6 +30,7 @@ if TYPE_CHECKING:
         FavoriteMoviesModel,
         CommentReactionModel,
     )
+
 
 class UserGroupEnum(str, enum.Enum):
     USER = "user"
