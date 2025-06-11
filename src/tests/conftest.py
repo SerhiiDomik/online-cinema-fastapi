@@ -3,7 +3,6 @@ import uuid
 from decimal import Decimal
 from typing import List
 
-import httpx
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy import insert, select

@@ -2,7 +2,7 @@ import aioboto3
 import pytest
 from io import BytesIO
 from PIL import Image
-from sqlalchemy import select, insert
+from sqlalchemy import select
 
 from database import User, UserProfileModel
 

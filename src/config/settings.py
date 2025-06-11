@@ -1,9 +1,7 @@
 import os
 from pathlib import Path
 
-from pydantic import HttpUrl
 from pydantic_settings import BaseSettings
-from sqlalchemy.dialects.postgresql import Any
 
 
 class BaseAppSettings(BaseSettings):

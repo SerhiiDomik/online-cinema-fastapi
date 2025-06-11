@@ -3,11 +3,11 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, distinct
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from database import get_db
-from database.models import GenreModel, MovieModel
+from database.models import GenreModel
 from schemas.movies import GenreReadSchema, GenreCreateSchema
 
 router = APIRouter()

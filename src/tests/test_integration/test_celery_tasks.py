@@ -1,6 +1,6 @@
 import pytest
 from datetime import datetime, timedelta, timezone
-from sqlalchemy import insert, select
+from sqlalchemy import select
 
 from celery_task.tasks import delete_expired_tokens_sync
 from database.models.users import (

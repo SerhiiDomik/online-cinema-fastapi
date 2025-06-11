@@ -1,6 +1,6 @@
 import uuid
 from collections import defaultdict
-from typing import List, Union
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.security import HTTPBearer
@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 from typing import Optional
 
-from database import get_db, User, UserGroupEnum
+from database import get_db, User
 from database.models import (
     MovieModel,
     GenreModel,

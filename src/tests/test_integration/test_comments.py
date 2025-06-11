@@ -311,7 +311,7 @@ async def test_get_comment_with_replies_full(
         headers={"Authorization": f"Bearer {token1}"},
     )
     reply1_id = reply1.json()["id"]
-    reply2 = await client.post(
+    await client.post(
         f"/comments/{root1_id}/reply/",
         json={"content": "Another reply to root1"},
         headers={"Authorization": f"Bearer {token2}"},

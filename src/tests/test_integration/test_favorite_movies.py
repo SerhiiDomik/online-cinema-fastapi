@@ -1,5 +1,4 @@
 import pytest
-from httpx import AsyncClient
 from decimal import Decimal
 
 
@@ -24,7 +23,7 @@ async def test_add_nonexistent_movie(client, create_activated_user_with_token):
     _, token = await create_activated_user_with_token()
 
     response = await client.post(
-        f"/favorite-movies/99999/", headers={"Authorization": f"Bearer {token}"}
+        "/favorite-movies/99999/", headers={"Authorization": f"Bearer {token}"}
     )
 
     assert response.status_code == 404

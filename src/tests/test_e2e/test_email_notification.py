@@ -13,7 +13,6 @@ from database import (
     User,
     RefreshTokenModel,
     PasswordResetTokenModel,
-    MovieModel,
 )
 
 TEST_EMAIL = "test@email.com"
