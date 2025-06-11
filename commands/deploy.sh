@@ -10,7 +10,7 @@ handle_error() {
 }
 
 # Navigate to the application directory
-cd /home/ubuntu/src/online_cinema_fastapi || handle_error "Failed to navigate to the application directory."
+cd /home/ubuntu/src/online-cinema-fastapi || handle_error "Failed to navigate to the application directory."
 
 # Fetch the latest changes from the remote repository
 echo "Fetching the latest changes from the remote repository..."
