@@ -210,3 +210,18 @@ jobs:
         if: always()
         run: |
           docker compose -f docker-compose-tests.yml down
+
+  test-e2e-storage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Start Docker Compose and wait for completion
+        run: |
+          docker compose -f docker-compose-tests.yml up test_storage --build --abort-on-container-exit --exit-code-from test_storage
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose -f docker-compose-tests.yml down
