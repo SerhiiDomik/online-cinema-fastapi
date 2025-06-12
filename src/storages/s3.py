@@ -40,6 +40,14 @@ class S3StorageClient(S3StorageInterface):
                     Body=file_data,
                     ContentType="image/jpeg",
                 )
+        except client.exceptions.NoSuchBucket:
+            await client.create_bucket(Bucket=self._bucket_name)
+            await client.put_object(
+                Bucket=self._bucket_name,
+                Key=file_name,
+                Body=file_data,
+                ContentType="image/jpeg",
+            )
         except (ConnectionError, HTTPClientError, NoCredentialsError) as e:
             raise S3ConnectionError(f"Failed to connect to S3 storage: {str(e)}") from e
         except BotoCoreError as e:
