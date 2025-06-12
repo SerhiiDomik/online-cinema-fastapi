@@ -181,7 +181,7 @@ jobs:
         run: |
           poetry run pytest src/tests/test_integration/test_favorite_movies.py
 
-  test-e2e:
+  test-e2e-email-notification:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -189,7 +189,22 @@ jobs:
 
       - name: Start Docker Compose and wait for completion
         run: |
-          docker compose -f docker-compose-tests.yml up --build --abort-on-container-exit --exit-code-from web
+          docker compose -f docker-compose-tests.yml up test_email_notification --build --abort-on-container-exit --exit-code-from test_email_notification
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker compose -f docker-compose-tests.yml down
+
+  test-e2e-comment-notification:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Start Docker Compose and wait for completion
+        run: |
+          docker compose -f docker-compose-tests.yml up test_comment_notification --build --abort-on-container-exit --exit-code-from test_comment_notification
 
       - name: Cleanup
         if: always()

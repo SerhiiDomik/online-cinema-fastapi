@@ -1,10 +1,43 @@
 services:
-  web:
+  test_email_notification:
     build:
       context: .
       dockerfile: ./docker/tests/Dockerfile
     container_name: backend_cinema_test
-    command: [ "pytest", "-c", "/usr/src/config/pytest.ini",
+    command: [ "pytest", "tests/test_e2e/test_email_notification.py", "-c", "/usr/src/config/pytest.ini",
+               "-m", "e2e", "--maxfail=5", "--disable-warnings", "-v", "--tb=short" ]
+    environment:
+      - PYTHONPATH=/usr/src/fastapi
+      - ENVIRONMENT=testing
+      - EMAIL_HOST=mailhog_cinema_test
+      - EMAIL_PORT=1025
+      - EMAIL_HOST_USER=testuser@mate.com
+      - EMAIL_HOST_PASSWORD=test_password
+      - EMAIL_USE_TLS=False
+      - MAILHOG_API_PORT=8025
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=some_password
+      - MINIO_HOST=minio-cinema-test
+      - MINIO_PORT=9000
+      - MINIO_STORAGE=cinema-storage
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      mailhog:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    volumes:
+      - ./src:/usr/src/fastapi
+    networks:
+      - cinema_network_test
+
+
+  test_comment_notification:
+    build:
+      context: .
+      dockerfile: ./docker/tests/Dockerfile
+    container_name: backend_cinema_test
+    command: [ "pytest", "tests/test_e2e/test_comment_notification.py", "-c", "/usr/src/config/pytest.ini",
                "-m", "e2e", "--maxfail=5", "--disable-warnings", "-v", "--tb=short"]
     environment:
       - PYTHONPATH=/usr/src/fastapi
